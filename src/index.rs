@@ -1372,7 +1372,7 @@ impl Index {
     }
 
     Ok(self.get_transaction(inscription_id.txid)?.and_then(|tx| {
-      ParsedEnvelope::from_transaction(&tx)
+      ParsedEnvelope::from_transaction(&tx, &Some("".to_string()))
         .into_iter()
         .nth(inscription_id.index as usize)
         .map(|envelope| envelope.payload)
@@ -1455,6 +1455,10 @@ impl Index {
       }
     }
 
+    self.client.get_raw_transaction(&txid, None).into_option()
+  }
+
+  pub(crate) fn get_raw_transaction(&self, txid: Txid) -> Result<Option<Transaction>> {
     self.client.get_raw_transaction(&txid, None).into_option()
   }
 
@@ -1800,7 +1804,7 @@ impl Index {
       return Ok(None);
     };
 
-    let Some(inscription) = ParsedEnvelope::from_transaction(&transaction)
+    let Some(inscription) = ParsedEnvelope::from_transaction(&transaction, &Some("".to_string()))
       .into_iter()
       .nth(entry.id.index as usize)
       .map(|envelope| envelope.payload)

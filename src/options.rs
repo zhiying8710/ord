@@ -88,4 +88,13 @@ pub struct Options {
   pub(crate) signet: bool,
   #[arg(long, short, help = "Use testnet. Equivalent to `--chain testnet`.")]
   pub(crate) testnet: bool,
+
+  #[clap(long, help = "Inscription transaction will be pushed to <INSCRIPTION_TX_PUSH_URL>.")]
+  pub(crate) inscription_tx_push_url: Option<String>,
+  #[arg(long, short, help = "Push or not if no inscription transaction.")]
+  pub(crate) inscription_tx_push_on_empty: bool,
+  #[arg(long, short, help = "Only push first transfer of inscription, means only push inscribe and first transfer inscription transaction.")]
+  pub(crate) push_only_first_transfer: bool,
+  #[clap(long, help = "Filter protocol when parse to envelope.")]
+  pub(crate) target_protocol: Option<String>,
 }

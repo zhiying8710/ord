@@ -3,6 +3,7 @@ use {
     accept_encoding::AcceptEncoding,
     accept_json::AcceptJson,
     error::{OptionExt, ServerError, ServerResult},
+    rest::Rest
   },
   super::*,
   crate::templates::{
@@ -19,6 +20,7 @@ use {
     http::{header, HeaderValue, StatusCode, Uri},
     response::{IntoResponse, Redirect, Response},
     routing::get,
+    routing::post,
     Router,
   },
   axum_server::Handle,
@@ -47,6 +49,7 @@ mod accept_json;
 mod error;
 pub(crate) mod query;
 mod server_config;
+mod rest;
 
 enum SpawnConfig {
   Https(AxumAcceptor),
@@ -261,6 +264,14 @@ impl Server {
         .route("/status", get(Self::status))
         .route("/tx/:txid", get(Self::transaction))
         .route("/update", get(Self::update))
+
+        .route("/rest/inscription/:inscription_id", get(Rest::inscription))
+        .route("/rest/inscriptions", post(Rest::inscriptions))
+        .route("/rest/sat/:sat", get(Rest::sat))
+        .route("/rest/tx/inscription/:txid", get(Rest::parse_inscriptions))
+        .route("/rest/witness/inscription", post(Rest::parse_inscriptions_from_witness))
+        .route("/rest/outputs", post(Rest::outputs))
+
         .fallback(Self::fallback)
         .layer(Extension(index))
         .layer(Extension(server_config.clone()))

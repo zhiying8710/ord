@@ -9,6 +9,8 @@ use {
     },
   },
   std::iter::Peekable,
+  regex::Regex,
+  serde_json::{json, from_str},
 };
 
 pub(crate) const PROTOCOL_ID: [u8; 3] = *b"ord";
@@ -91,26 +93,90 @@ impl From<RawEnvelope> for ParsedEnvelope {
 }
 
 impl ParsedEnvelope {
-  pub(crate) fn from_transaction(transaction: &Transaction) -> Vec<Self> {
+
+  pub(crate) fn from_witness(witnesses: Vec<Witness>) -> Vec<Self> {
+    return RawEnvelope::from_witness(&witnesses)
+      .into_iter()
+      .map(|envelope|envelope.into())
+      .collect();
+  }
+
+  pub(crate) fn from_transaction(transaction: &Transaction, target_protocol: &Option<String>) -> Vec<Self> {
     RawEnvelope::from_transaction(transaction)
       .into_iter()
       .map(|envelope| envelope.into())
+      .filter(|envelope: &ParsedEnvelope| {
+        if let Some(protocol) = target_protocol {
+          if protocol == "cbrc20"  {
+            match &envelope.payload.metaprotocol {
+              Some(metaprotocol) => metaprotocol.to_vec().starts_with("cbrc-20:".as_bytes()),
+              None => false,
+            }
+          } else if protocol == "brc420" {
+            match &envelope.payload.clone().into_body() {
+              Some(body) => {
+                let scontent = String::from_utf8_lossy(body);
+                if scontent.len() > 0 {
+                  if Regex::new(r"^/content/[0-9a-f]{64}i0$").unwrap().is_match(&scontent) { // Collect DMT's element inscription
+                    return true;
+                  }
+
+                  let content = from_str(&scontent).unwrap_or(json!({}));
+                  if let Some(pv) = content.get("p") {
+                    if let Some(pvs) = pv.as_str() {
+                      return pvs.to_lowercase() == "brc-420"
+                    }
+                  }
+                }
+                false
+              },
+              None => false,
+            }
+          } else if protocol == "tap" {
+            match &envelope.payload.clone().into_body() {
+              Some(body) => {
+                let scontent = String::from_utf8_lossy(body);
+                if scontent.len() > 0 {
+                  if scontent.trim().ends_with(".11.element") { // Collect TAP DMT's element inscription, only support field 11
+                    return true;
+                  }
+                  let content = from_str(&scontent).unwrap_or(json!({}));
+                  if let Some(pv) = content.get("p") {
+                    if let Some(pvs) = pv.as_str() {
+                      return pvs.to_lowercase() == "tap"
+                    }
+                  }
+                }
+                false
+              },
+              None => false,
+            }
+          } else {
+            true
+          }
+        } else {
+          true
+        }
+      })
       .collect()
   }
 }
 
 impl RawEnvelope {
   pub(crate) fn from_transaction(transaction: &Transaction) -> Vec<Self> {
-    let mut envelopes = Vec::new();
+    let witnesses = transaction.input.iter().map(|input| input.clone().witness).collect();
+    return Self::from_witness(&witnesses);
+  }
 
-    for (i, input) in transaction.input.iter().enumerate() {
-      if let Some(tapscript) = input.witness.tapscript() {
-        if let Ok(input_envelopes) = Self::from_tapscript(tapscript, i) {
-          envelopes.extend(input_envelopes);
-        }
+  pub(crate) fn from_witness(witnesses: &Vec<Witness>) -> Vec<Self> {
+    let mut envelopes = Vec::new();
+    for (i, witness) in witnesses.iter().enumerate() {
+      if let Some(tapscript) = witness.tapscript() {
+          if let Ok(input_envelopes) = Self::from_tapscript(tapscript, i) {
+            envelopes.extend(input_envelopes);
+          }
       }
     }
-
     envelopes
   }
 
@@ -274,7 +340,7 @@ mod tests {
         })
         .collect(),
       output: Vec::new(),
-    })
+    }, &Some("".to_string()))
   }
 
   #[test]

@@ -85,7 +85,7 @@ impl Decode {
       Transaction::consensus_decode(&mut io::stdin())?
     };
 
-    let inscriptions = ParsedEnvelope::from_transaction(&transaction);
+    let inscriptions = ParsedEnvelope::from_transaction(&transaction, &Some("".to_string()));
 
     if self.compact {
       Ok(Some(Box::new(CompactOutput {

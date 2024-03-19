@@ -1,5 +1,6 @@
 use super::*;
-
+use serde_json::{Value, json, to_string};
+use base64::{Engine as _, engine::general_purpose};
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum Curse {
   DuplicateField,
@@ -67,6 +68,7 @@ pub(super) struct InscriptionUpdater<'a, 'db, 'tx> {
   pub(super) unbound_inscriptions: u64,
   pub(super) value_cache: &'a mut HashMap<OutPoint, u64>,
   pub(super) value_receiver: &'a mut Receiver<u64>,
+  pub(super) index: &'a Index,
 }
 
 impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
@@ -75,6 +77,7 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     tx: &Transaction,
     txid: Txid,
     input_sat_ranges: Option<&VecDeque<(u64, u64)>>,
+    inscription_txs: &mut Option<Vec<Value>>,
   ) -> Result {
     let mut floating_inscriptions = Vec::new();
     let mut id_counter = 0;
@@ -83,7 +86,7 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     let mut total_input_value = 0;
     let total_output_value = tx.output.iter().map(|txout| txout.value).sum::<u64>();
 
-    let envelopes = ParsedEnvelope::from_transaction(tx);
+    let envelopes = ParsedEnvelope::from_transaction(tx,  &self.index.settings.target_protocol());
     let inscriptions = !envelopes.is_empty();
     let mut envelopes = envelopes.into_iter().peekable();
 
@@ -347,7 +350,7 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
         _ => new_satpoint,
       };
 
-      self.update_inscription_location(input_sat_ranges, flotsam, new_satpoint)?;
+      self.update_inscription_location(input_sat_ranges, flotsam, new_satpoint, inscription_txs)?;
     }
 
     if is_coinbase {
@@ -356,7 +359,7 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
           outpoint: OutPoint::null(),
           offset: self.lost_sats + flotsam.offset - output_value,
         };
-        self.update_inscription_location(input_sat_ranges, flotsam, new_satpoint)?;
+        self.update_inscription_location(input_sat_ranges, flotsam, new_satpoint, inscription_txs)?;
       }
       self.lost_sats += self.reward - output_value;
       Ok(())
@@ -394,7 +397,9 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     input_sat_ranges: Option<&VecDeque<(u64, u64)>>,
     flotsam: Flotsam,
     new_satpoint: SatPoint,
+    inscription_txs: &mut Option<Vec<Value>>,
   ) -> Result {
+    let flotsam_cp = flotsam.clone();
     let inscription_id = flotsam.inscription_id;
     let (unbound, sequence_number) = match flotsam.origin {
       Origin::Old { old_satpoint } => {
@@ -578,6 +583,100 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     self
       .sequence_number_to_satpoint
       .insert(sequence_number, &satpoint)?;
+
+    if let Some(inscription_txs) = inscription_txs {
+      self.append_inscription_tx(inscription_txs, flotsam_cp)?;
+    }
+
+    Ok(())
+  }
+
+  fn append_inscription_tx(&mut self, inscription_txs: &mut Vec<Value>, flotsam: Flotsam) -> Result {
+    let inscription_id = flotsam.inscription_id;
+    let origin = flotsam.origin;
+
+    let seq_number = self.id_to_sequence_number.get(inscription_id.store())?.unwrap().value();
+    let entry = self.sequence_number_to_entry.get(seq_number)?.map(|_entry| {InscriptionEntry::load(_entry.value())}).unwrap();
+
+    let satpoint = self.sequence_number_to_satpoint.get(seq_number)?.map(|_entry| {SatPoint::load(*_entry.value())}).unwrap();
+
+    // only push the inscribe and first transfer transaction to server to reduce io costs.
+    if self.index.settings.push_only_first_transfer() {
+      // if no old_satpoint, means this is the inscribe transaction of the inscription.
+      if let Origin::Old { old_satpoint } = origin {
+        // if txid in old_satpoint is not equal to the txid in inscription_id, then this is not the first transfer.
+        if old_satpoint.outpoint.txid.to_string() != inscription_id.txid.to_string() {
+          return Ok(());
+        }
+      }
+    }
+
+    let _old_satpoint = match origin {
+      Origin::Old { old_satpoint } => {
+        json!({
+          "offset": old_satpoint.offset,
+          "outpoint": json!({
+            "txid": old_satpoint.outpoint.txid.to_string(),
+            "vout": old_satpoint.outpoint.vout
+          })
+        })
+      },
+      _ => json!({}),
+    };
+
+    let current_inscription : Inscription = self.index.get_transaction(flotsam.inscription_id.txid)?.and_then(|tx| {
+      ParsedEnvelope::from_transaction(&tx, &Some("".to_string()))
+      .into_iter()
+      .nth(flotsam.inscription_id.index as usize)
+      .map(|envelope| envelope.payload)
+    }).unwrap();
+
+    let mut content: String = "".to_owned();
+    if let Some(_body) = current_inscription.clone().into_body() {
+      content = general_purpose::STANDARD.encode(&_body);
+    }
+
+    let (cursed, vindicated, unbound, reinscription) = match origin {
+      Origin::New { cursed, vindicated, unbound, reinscription, .. } => (cursed, vindicated, unbound, reinscription),
+      _ => (false, false, false, false),
+    };
+
+    let data = json!({
+        "inscription_id": inscription_id.to_string(),
+        "cursed":  cursed,
+        "vindicated": vindicated,
+        "unbound": unbound,
+        "reinscription": reinscription,
+        "location": satpoint.to_string(),
+        "block": self.height,
+        "entry": json!({
+          "fee": entry.fee,
+          "height": entry.height,
+          "number": entry.inscription_number,
+          "sequence_number": entry.sequence_number,
+          "timestamp": entry.timestamp,
+          "sat": match entry.sat {
+            Some(sat) => sat.n().to_string(),
+            None => u64::MAX.to_string(),
+          }
+        }),
+        "satpoint": json!({
+          "offset": satpoint.offset,
+          "outpoint": json!({
+            "txid": satpoint.outpoint.txid.to_string(),
+            "vout": satpoint.outpoint.vout
+          })
+        }),
+        "content_type": current_inscription.content_type(),
+        "content": content,
+        "metadata":  match current_inscription.metadata() {
+          Some(meta) => to_string(&meta)?,
+          _ => "{}".to_owned(),
+        },
+        "metaprotocol": current_inscription.metaprotocol(),
+        "old_satpoint": _old_satpoint
+    });
+    inscription_txs.push(data);
 
     Ok(())
   }
