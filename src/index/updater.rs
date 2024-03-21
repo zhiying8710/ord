@@ -4,7 +4,7 @@ use {
   futures::future::try_join_all,
   std::sync::mpsc,
   tokio::sync::mpsc::{error::TryRecvError, Receiver, Sender},
-  serde_json::Value,
+  serde_json::{Value, json},
   ureq::{Error, Response},
   std::thread::sleep,
 };
@@ -342,6 +342,7 @@ impl<'index> Updater<'index> {
       && self.index.settings.index_inscriptions();
 
     let mut inscription_txs: Option<Vec<Value>> = None;
+    let mut rune_txs: Option<Vec<Value>> = None;
 
     if index_inscriptions {
       if let Some(_) = self.index.settings.inscription_tx_push_url() {
@@ -593,6 +594,10 @@ impl<'index> Updater<'index> {
     )?;
 
     if self.index.index_runes && self.height >= self.index.settings.first_rune_height() {
+      if let Some(_) = self.index.settings.rune_tx_push_url() {
+        rune_txs = Some(Vec::new());
+      }
+
       let mut outpoint_to_rune_balances = wtx.open_table(OUTPOINT_TO_RUNE_BALANCES)?;
       let mut outpoint_to_output = wtx.open_table(OUTPOINT_TO_OUTPUT)?;
       let mut rune_id_to_rune_entry = wtx.open_table(RUNE_ID_TO_RUNE_ENTRY)?;
@@ -647,10 +652,18 @@ impl<'index> Updater<'index> {
     self.outputs_traversed += outputs_in_block;
 
     if let Some(inscription_tx_push_url) = self.index.settings.inscription_tx_push_url() {
-      if let Some(inscription_txs) = inscription_txs {
+      if let Some(mut inscription_txs) = inscription_txs {
         let tx_count = inscription_txs.len();
         if tx_count > 0 || self.index.settings.inscription_tx_push_on_empty() {
           let push_start = Instant::now();
+          // push mark data to server let it know that this block has no inscription txs
+          if self.index.settings.inscription_tx_push_on_empty() && tx_count == 0 {
+            log::info!("Will push empty mark data to server on height {}", self.height - 1);
+            inscription_txs.push(json!({
+              "inscription_id": "EMPTY_MARK",
+              "block": self.height - 1, // self.height has already plus 1
+            }));
+          }
           let data = Value::Array(inscription_txs);
           let mut reorg = false;
 
