@@ -97,4 +97,7 @@ pub struct Options {
   pub(crate) push_only_first_transfer: bool,
   #[clap(long, help = "Filter protocol when parse to envelope.")]
   pub(crate) target_protocol: Option<String>,
+
+  #[clap(long, help = "Rune transaction will be pushed to <RUNE_TX_PUSH_URL>.")]
+  pub(crate) rune_tx_push_url: Option<String>,
 }

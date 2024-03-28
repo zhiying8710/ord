@@ -31,6 +31,8 @@ pub struct Settings {
   inscription_tx_push_on_empty: bool,
   push_only_first_transfer: bool,
   target_protocol: Option<String>,
+
+  rune_tx_push_url: Option<String>,
 }
 
 impl Settings {
@@ -152,6 +154,8 @@ impl Settings {
       inscription_tx_push_on_empty: source.inscription_tx_push_on_empty,
       push_only_first_transfer: source.push_only_first_transfer,
       target_protocol: source.target_protocol,
+
+      rune_tx_push_url: source.rune_tx_push_url
     }
   }
 
@@ -193,6 +197,10 @@ impl Settings {
       inscription_tx_push_on_empty: options.inscription_tx_push_on_empty,
       push_only_first_transfer: options.push_only_first_transfer,
       target_protocol: options.target_protocol,
+      rune_tx_push_url: match &options.rune_tx_push_url {
+        Some(url) => Some(url.to_string()),
+        None => None
+      },
     }
   }
 
@@ -275,6 +283,8 @@ impl Settings {
       inscription_tx_push_on_empty: get_bool("INSCRIPTION_TX_PUSH_ON_EMPTY"),
       push_only_first_transfer: get_bool("PUSH_ONLY_FIRST_TRANSFER"),
       target_protocol: get_string("TARGET_PROTOCOL"),
+
+      rune_tx_push_url: get_string("RUN_TX_PUSH_URL"),
     })
   }
 
@@ -308,6 +318,8 @@ impl Settings {
       inscription_tx_push_on_empty: false,
       push_only_first_transfer: false,
       target_protocol: None,
+
+      rune_tx_push_url: None,
     }
   }
 
@@ -391,6 +403,8 @@ impl Settings {
       inscription_tx_push_on_empty: self.inscription_tx_push_on_empty,
       push_only_first_transfer: self.push_only_first_transfer,
       target_protocol: self.target_protocol,
+
+      rune_tx_push_url: self.rune_tx_push_url,
     })
   }
 
@@ -598,6 +612,10 @@ impl Settings {
 
   pub(crate) fn target_protocol(&self) -> Option<String> {
     self.target_protocol.clone()
+  }
+
+  pub(crate) fn rune_tx_push_url(&self) -> Option<String> {
+    self.rune_tx_push_url.clone()
   }
 
 }
@@ -1097,6 +1115,7 @@ mod tests {
         inscription_tx_push_on_empty: false,
         push_only_first_transfer: false,
         target_protocol: None,
+        rune_tx_push_url: None,
       }
     );
   }
@@ -1161,6 +1180,7 @@ mod tests {
         inscription_tx_push_on_empty: false,
         push_only_first_transfer: false,
         target_protocol: None,
+        rune_tx_push_url: None,
       }
     );
   }
