@@ -112,7 +112,7 @@ impl From<InscriptionTemplate> for Inscription {
     Self {
       parents: template.parents.into_iter().map(|id| id.value()).collect(),
       pointer: template.pointer.map(Inscription::pointer_value),
-      ..Default::default()
+      ..default()
     }
   }
 }
@@ -131,7 +131,7 @@ pub(crate) fn inscription_id(n: u32) -> InscriptionId {
   format!("{}i{n}", hex.repeat(64)).parse().unwrap()
 }
 
-pub(crate) fn rune_id(tx: u16) -> RuneId {
+pub(crate) fn rune_id(tx: u32) -> RuneId {
   RuneId { block: 1, tx }
 }
 

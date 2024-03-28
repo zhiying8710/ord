@@ -10,7 +10,7 @@ pub struct RuneHtml {
 
 impl PageContent for RuneHtml {
   fn title(&self) -> String {
-    format!("Rune {}", self.entry.spaced_rune())
+    format!("Rune {}", self.entry.spaced_rune)
   }
 }
 
@@ -23,20 +23,23 @@ mod tests {
     assert_regex_match!(
       RuneHtml {
         entry: RuneEntry {
+          block: 1,
           burned: 123456789123456789,
           divisibility: 9,
           etching: Txid::all_zeros(),
           mints: 100,
-          mint: Some(MintEntry {
-            end: Some(11),
-            limit: Some(1000000001),
-            deadline: Some(7),
+          terms: Some(Terms {
+            cap: Some(101),
+            offset: (None, None),
+            height: (Some(10), Some(11)),
+            amount: Some(1000000001),
           }),
           number: 25,
           premine: 123456789,
-          rune: Rune(u128::MAX),
-          spacers: 1,
-          supply: 123456789123456789,
+          spaced_rune: SpacedRune {
+            rune: Rune(u128::MAX),
+            spacers: 1
+          },
           symbol: Some('%'),
           timestamp: 0,
         },
@@ -48,7 +51,7 @@ mod tests {
         }),
       },
       "<h1>B•CGDENLQRQWDSLRUGSNLBTMFIJAV</h1>
-<iframe .* src=/preview/0{64}i0></iframe>
+.*<a href=/inscription/.*<iframe .* src=/preview/0{64}i0></iframe></a>.*
 <dl>
   <dt>number</dt>
   <dd>25</dd>
@@ -63,24 +66,28 @@ mod tests {
   <dt>mint</dt>
   <dd>
     <dl>
-      <dt>deadline</dt>
-      <dd><time>1970-01-01 00:00:07 UTC</time></dd>
+      <dt>start</dt>
+      <dd><a href=/block/10>10</a></dd>
       <dt>end</dt>
       <dd><a href=/block/11>11</a></dd>
-      <dt>limit</dt>
+      <dt>amount</dt>
       <dd>1.000000001 %</dd>
       <dt>mints</dt>
       <dd>100</dd>
+      <dt>cap</dt>
+      <dd>101</dd>
+      <dt>remaining</dt>
+      <dd>1</dd>
       <dt>mintable</dt>
       <dd>true</dd>
     </dl>
   </dd>
   <dt>supply</dt>
-  <dd>123456789.123456789\u{00A0}%</dd>
+  <dd>100.123456889\u{A0}%</dd>
   <dt>premine</dt>
-  <dd>0.123456789\u{00A0}%</dd>
+  <dd>0.123456789\u{A0}%</dd>
   <dt>burned</dt>
-  <dd>123456789.123456789\u{00A0}%</dd>
+  <dd>123456789.123456789\u{A0}%</dd>
   <dt>divisibility</dt>
   <dd>9</dd>
   <dt>symbol</dt>
@@ -99,16 +106,18 @@ mod tests {
     assert_regex_match!(
       RuneHtml {
         entry: RuneEntry {
+          block: 0,
           burned: 123456789123456789,
-          mint: None,
+          terms: None,
           divisibility: 9,
           etching: Txid::all_zeros(),
           mints: 0,
           number: 25,
           premine: 0,
-          rune: Rune(u128::MAX),
-          spacers: 1,
-          supply: 123456789123456789,
+          spaced_rune: SpacedRune {
+            rune: Rune(u128::MAX),
+            spacers: 1
+          },
           symbol: Some('%'),
           timestamp: 0,
         },
@@ -117,32 +126,10 @@ mod tests {
         parent: None,
       },
       "<h1>B•CGDENLQRQWDSLRUGSNLBTMFIJAV</h1>
-<dl>
-  <dt>number</dt>
-  <dd>25</dd>
-  <dt>timestamp</dt>
-  <dd><time>1970-01-01 00:00:00 UTC</time></dd>
-  <dt>id</dt>
-  <dd>10:9</dd>
-  <dt>etching block</dt>
-  <dd><a href=/block/10>10</a></dd>
-  <dt>etching transaction</dt>
-  <dd>9</dd>
+<dl>.*
   <dt>mint</dt>
   <dd>no</dd>
-  <dt>supply</dt>
-  <dd>123456789.123456789\u{00A0}%</dd>
-  <dt>premine</dt>
-  <dd>0\u{00A0}%</dd>
-  <dt>burned</dt>
-  <dd>123456789.123456789\u{00A0}%</dd>
-  <dt>divisibility</dt>
-  <dd>9</dd>
-  <dt>symbol</dt>
-  <dd>%</dd>
-  <dt>etching</dt>
-  <dd><a class=monospace href=/tx/0{64}>0{64}</a></dd>
-</dl>
+.*</dl>
 "
     );
   }
@@ -152,20 +139,23 @@ mod tests {
     assert_regex_match!(
       RuneHtml {
         entry: RuneEntry {
+          block: 0,
           burned: 123456789123456789,
-          mint: Some(MintEntry {
-            deadline: None,
-            end: None,
-            limit: None,
+          terms: Some(Terms {
+            cap: None,
+            offset: (None, None),
+            height: (None, None),
+            amount: None,
           }),
           divisibility: 9,
           etching: Txid::all_zeros(),
           mints: 0,
           premine: 0,
           number: 25,
-          rune: Rune(u128::MAX),
-          spacers: 1,
-          supply: 123456789123456789,
+          spaced_rune: SpacedRune {
+            rune: Rune(u128::MAX),
+            spacers: 1
+          },
           symbol: Some('%'),
           timestamp: 0,
         },
@@ -174,45 +164,27 @@ mod tests {
         parent: None,
       },
       "<h1>B•CGDENLQRQWDSLRUGSNLBTMFIJAV</h1>
-<dl>
-  <dt>number</dt>
-  <dd>25</dd>
-  <dt>timestamp</dt>
-  <dd><time>1970-01-01 00:00:00 UTC</time></dd>
-  <dt>id</dt>
-  <dd>10:9</dd>
-  <dt>etching block</dt>
-  <dd><a href=/block/10>10</a></dd>
-  <dt>etching transaction</dt>
-  <dd>9</dd>
+<dl>.*
   <dt>mint</dt>
   <dd>
     <dl>
-      <dt>deadline</dt>
+      <dt>start</dt>
       <dd>none</dd>
       <dt>end</dt>
       <dd>none</dd>
-      <dt>limit</dt>
+      <dt>amount</dt>
       <dd>none</dd>
       <dt>mints</dt>
+      <dd>0</dd>
+      <dt>cap</dt>
+      <dd>0</dd>
+      <dt>remaining</dt>
       <dd>0</dd>
       <dt>mintable</dt>
       <dd>false</dd>
     </dl>
   </dd>
-  <dt>supply</dt>
-  <dd>123456789.123456789\u{00A0}%</dd>
-  <dt>premine</dt>
-  <dd>0\u{00A0}%</dd>
-  <dt>burned</dt>
-  <dd>123456789.123456789\u{00A0}%</dd>
-  <dt>divisibility</dt>
-  <dd>9</dd>
-  <dt>symbol</dt>
-  <dd>%</dd>
-  <dt>etching</dt>
-  <dd><a class=monospace href=/tx/0{64}>0{64}</a></dd>
-</dl>
+.*</dl>
 "
     );
   }

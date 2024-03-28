@@ -68,7 +68,7 @@ fn send_unknown_inscription() {
 }
 
 #[test]
-fn send_inscribed_sat() {
+fn send_inscribed_inscription() {
   let bitcoin_rpc_server = test_bitcoincore_rpc::spawn();
 
   let ord_rpc_server = TestServer::spawn_with_server_args(&bitcoin_rpc_server, &[], &[]);
@@ -96,6 +96,68 @@ fn send_inscribed_sat() {
     format!("/inscription/{inscription}"),
     format!(
       ".*<h1>Inscription 0</h1>.*<dt>location</dt>.*<dd class=monospace>{send_txid}:0:0</dd>.*",
+    ),
+  );
+}
+
+#[test]
+fn send_uninscribed_sat() {
+  let bitcoin_rpc_server = test_bitcoincore_rpc::spawn();
+
+  let ord_rpc_server =
+    TestServer::spawn_with_server_args(&bitcoin_rpc_server, &["--index-sats"], &[]);
+
+  create_wallet(&bitcoin_rpc_server, &ord_rpc_server);
+
+  let sat = Sat(1);
+
+  CommandBuilder::new(format!(
+    "wallet send --fee-rate 1 bc1qcqgs2pps4u4yedfyl5pysdjjncs8et5utseepv {}",
+    sat.name(),
+  ))
+  .bitcoin_rpc_server(&bitcoin_rpc_server)
+  .ord_rpc_server(&ord_rpc_server)
+  .expected_stderr(format!(
+    "error: could not find sat `{sat}` in wallet outputs\n"
+  ))
+  .expected_exit_code(1)
+  .run_and_extract_stdout();
+}
+
+#[test]
+fn send_inscription_by_sat() {
+  let bitcoin_rpc_server = test_bitcoincore_rpc::spawn();
+
+  let ord_rpc_server =
+    TestServer::spawn_with_server_args(&bitcoin_rpc_server, &["--index-sats"], &[]);
+
+  create_wallet(&bitcoin_rpc_server, &ord_rpc_server);
+
+  bitcoin_rpc_server.mine_blocks(1);
+
+  let (inscription, txid) = inscribe(&bitcoin_rpc_server, &ord_rpc_server);
+
+  bitcoin_rpc_server.mine_blocks(1);
+
+  let sat_list = sats(&bitcoin_rpc_server, &ord_rpc_server);
+
+  let sat = sat_list.iter().find(|s| s.output.txid == txid).unwrap().sat;
+
+  let address = "bc1qcqgs2pps4u4yedfyl5pysdjjncs8et5utseepv";
+
+  let output = CommandBuilder::new(format!("wallet send --fee-rate 1 {address} {}", sat.name()))
+    .bitcoin_rpc_server(&bitcoin_rpc_server)
+    .ord_rpc_server(&ord_rpc_server)
+    .run_and_deserialize_output::<Send>();
+
+  bitcoin_rpc_server.mine_blocks(1);
+
+  let send_txid = output.txid;
+
+  ord_rpc_server.assert_response_regex(
+    format!("/inscription/{inscription}"),
+    format!(
+      ".*<h1>Inscription 0</h1>.*<dt>address</dt>.*<dd class=monospace>{address}</dd>.*<dt>location</dt>.*<dd class=monospace>{send_txid}:0:0</dd>.*",
     ),
   );
 }
@@ -640,7 +702,7 @@ fn sending_rune_that_has_not_been_etched_is_an_error() {
 
   bitcoin_rpc_server.lock(outpoint);
 
-  CommandBuilder::new("--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1FOO")
+  CommandBuilder::new("--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1:FOO")
     .bitcoin_rpc_server(&bitcoin_rpc_server)
     .ord_rpc_server(&ord_rpc_server)
     .expected_exit_code(1)
@@ -662,7 +724,7 @@ fn sending_rune_with_excessive_precision_is_an_error() {
   etch(&bitcoin_rpc_server, &ord_rpc_server, Rune(RUNE));
 
   CommandBuilder::new(format!(
-    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1.1{}",
+    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1.1:{}",
     Rune(RUNE)
   ))
   .bitcoin_rpc_server(&bitcoin_rpc_server)
@@ -686,13 +748,13 @@ fn sending_rune_with_insufficient_balance_is_an_error() {
   etch(&bitcoin_rpc_server, &ord_rpc_server, Rune(RUNE));
 
   CommandBuilder::new(format!(
-    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1001{}",
+    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1001:{}",
     Rune(RUNE)
   ))
   .bitcoin_rpc_server(&bitcoin_rpc_server)
     .ord_rpc_server(&ord_rpc_server)
   .expected_exit_code(1)
-  .expected_stderr("error: insufficient `AAAAAAAAAAAAA` balance, only 1000\u{00A0}¢ in wallet\n")
+  .expected_stderr("error: insufficient `AAAAAAAAAAAAA` balance, only 1000\u{A0}¢ in wallet\n")
   .run_and_extract_stdout();
 }
 
@@ -710,7 +772,7 @@ fn sending_rune_works() {
   etch(&bitcoin_rpc_server, &ord_rpc_server, Rune(RUNE));
 
   let output = CommandBuilder::new(format!(
-    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1000{}",
+    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1000:{}",
     Rune(RUNE)
   ))
   .bitcoin_rpc_server(&bitcoin_rpc_server)
@@ -728,7 +790,7 @@ fn sending_rune_works() {
     balances,
     ord::subcommand::balances::Output {
       runes: vec![(
-        Rune(RUNE),
+        SpacedRune::new(Rune(RUNE), 0),
         vec![(
           OutPoint {
             txid: output.txid,
@@ -763,7 +825,7 @@ fn sending_spaced_rune_works() {
   etch(&bitcoin_rpc_server, &ord_rpc_server, Rune(RUNE));
 
   let output = CommandBuilder::new(
-    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1000A•AAAAAAAAAAAA",
+    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1000:A•AAAAAAAAAAAA",
   )
   .bitcoin_rpc_server(&bitcoin_rpc_server)
     .ord_rpc_server(&ord_rpc_server)
@@ -780,7 +842,7 @@ fn sending_spaced_rune_works() {
     balances,
     ord::subcommand::balances::Output {
       runes: vec![(
-        Rune(RUNE),
+        SpacedRune::new(Rune(RUNE), 0),
         vec![(
           OutPoint {
             txid: output.txid,
@@ -819,24 +881,25 @@ fn sending_rune_with_divisibility_works() {
   batch(
     &bitcoin_rpc_server,
     &ord_rpc_server,
-    Batchfile {
-      etch: Some(Etch {
+    batch::File {
+      etching: Some(batch::Etching {
         divisibility: 1,
         rune: SpacedRune { rune, spacers: 0 },
         premine: "1000".parse().unwrap(),
+        supply: "1000".parse().unwrap(),
         symbol: '¢',
-        mint: None,
+        terms: None,
       }),
-      inscriptions: vec![BatchEntry {
+      inscriptions: vec![batch::Entry {
         file: "inscription.jpeg".into(),
-        ..Default::default()
+        ..default()
       }],
-      ..Default::default()
+      ..default()
     },
   );
 
   let output = CommandBuilder::new(format!(
-    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 10.1{}",
+    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 10.1:{}",
     rune
   ))
   .bitcoin_rpc_server(&bitcoin_rpc_server)
@@ -854,7 +917,7 @@ fn sending_rune_with_divisibility_works() {
     balances,
     ord::subcommand::balances::Output {
       runes: vec![(
-        Rune(RUNE),
+        SpacedRune::new(Rune(RUNE), 0),
         vec![
           (
             OutPoint {
@@ -902,7 +965,7 @@ fn sending_rune_leaves_unspent_runes_in_wallet() {
   etch(&bitcoin_rpc_server, &ord_rpc_server, Rune(RUNE));
 
   let output = CommandBuilder::new(format!(
-    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 750{}",
+    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 750:{}",
     Rune(RUNE)
   ))
   .bitcoin_rpc_server(&bitcoin_rpc_server)
@@ -920,7 +983,7 @@ fn sending_rune_leaves_unspent_runes_in_wallet() {
     balances,
     ord::subcommand::balances::Output {
       runes: vec![(
-        Rune(RUNE),
+        SpacedRune::new(Rune(RUNE), 0),
         vec![
           (
             OutPoint {
@@ -983,7 +1046,7 @@ fn sending_rune_creates_transaction_with_expected_runestone() {
       wallet
       send
       --fee-rate 1
-      bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 750{}
+      bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 750:{}
     ",
     Rune(RUNE),
   ))
@@ -1002,7 +1065,7 @@ fn sending_rune_creates_transaction_with_expected_runestone() {
     balances,
     ord::subcommand::balances::Output {
       runes: vec![(
-        Rune(RUNE),
+        SpacedRune::new(Rune(RUNE), 0),
         vec![
           (
             OutPoint {
@@ -1040,7 +1103,7 @@ fn sending_rune_creates_transaction_with_expected_runestone() {
   pretty_assert_eq!(
     Runestone::from_transaction(&tx).unwrap(),
     Runestone {
-      default_output: None,
+      pointer: None,
       etching: None,
       edicts: vec![Edict {
         id: etch.id,
@@ -1048,7 +1111,7 @@ fn sending_rune_creates_transaction_with_expected_runestone() {
         output: 2
       }],
       cenotaph: false,
-      claim: None,
+      mint: None,
     },
   );
 }
@@ -1067,15 +1130,15 @@ fn error_messages_use_spaced_runes() {
   etch(&bitcoin_rpc_server, &ord_rpc_server, Rune(RUNE));
 
   CommandBuilder::new(
-    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1001A•AAAAAAAAAAAA",
+    "--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1001:A•AAAAAAAAAAAA",
   )
   .bitcoin_rpc_server(&bitcoin_rpc_server)
     .ord_rpc_server(&ord_rpc_server)
   .expected_exit_code(1)
-  .expected_stderr("error: insufficient `A•AAAAAAAAAAAA` balance, only 1000\u{00A0}¢ in wallet\n")
+  .expected_stderr("error: insufficient `A•AAAAAAAAAAAA` balance, only 1000\u{A0}¢ in wallet\n")
   .run_and_extract_stdout();
 
-  CommandBuilder::new("--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1F•OO")
+  CommandBuilder::new("--chain regtest --index-runes wallet send --fee-rate 1 bcrt1qs758ursh4q9z627kt3pp5yysm78ddny6txaqgw 1:F•OO")
     .bitcoin_rpc_server(&bitcoin_rpc_server)
     .ord_rpc_server(&ord_rpc_server)
     .expected_exit_code(1)

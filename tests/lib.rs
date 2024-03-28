@@ -11,14 +11,10 @@ use {
   chrono::{DateTime, Utc},
   executable_path::executable_path,
   ord::{
-    api,
-    chain::Chain,
-    outgoing::Outgoing,
-    subcommand::runes::RuneInfo,
-    wallet::inscribe::{BatchEntry, Batchfile, Etch},
-    Edict, InscriptionId, Pile, Rune, RuneEntry, RuneId, Runestone, SpacedRune,
+    api, chain::Chain, outgoing::Outgoing, subcommand::runes::RuneInfo, wallet::batch, Edict,
+    InscriptionId, Pile, Rune, RuneEntry, RuneId, Runestone, SpacedRune,
   },
-  ordinals::{Rarity, Sat, SatPoint},
+  ordinals::{Charm, Rarity, Sat, SatPoint},
   pretty_assertions::assert_eq as pretty_assert_eq,
   regex::Regex,
   reqwest::{StatusCode, Url},
@@ -78,7 +74,7 @@ const RUNE: u128 = 99246114928149462;
 
 type Balance = ord::subcommand::wallet::balance::Output;
 type Create = ord::subcommand::wallet::create::Output;
-type Inscribe = ord::wallet::inscribe::Output;
+type Inscribe = ord::wallet::batch::Output;
 type Inscriptions = Vec<ord::subcommand::wallet::inscriptions::Output>;
 type Send = ord::subcommand::wallet::send::Output;
 type Supply = ord::subcommand::supply::Output;
@@ -109,6 +105,19 @@ fn receive(
   address
     .require_network(bitcoin_rpc_server.state().network)
     .unwrap()
+}
+
+fn sats(
+  bitcoin_rpc_server: &test_bitcoincore_rpc::Handle,
+  ord_rpc_server: &TestServer,
+) -> Vec<ord::subcommand::wallet::sats::OutputRare> {
+  CommandBuilder::new(format!(
+    "--chain {} wallet sats",
+    bitcoin_rpc_server.network()
+  ))
+  .bitcoin_rpc_server(bitcoin_rpc_server)
+  .ord_rpc_server(ord_rpc_server)
+  .run_and_deserialize_output::<Vec<ord::subcommand::wallet::sats::OutputRare>>()
 }
 
 fn inscribe(
@@ -177,19 +186,20 @@ fn etch(
   batch(
     bitcoin_rpc_server,
     ord_rpc_server,
-    Batchfile {
-      etch: Some(Etch {
+    batch::File {
+      etching: Some(batch::Etching {
+        supply: "1000".parse().unwrap(),
         divisibility: 0,
-        mint: None,
+        terms: None,
         premine: "1000".parse().unwrap(),
         rune: SpacedRune { rune, spacers: 0 },
         symbol: '¢',
       }),
-      inscriptions: vec![BatchEntry {
+      inscriptions: vec![batch::Entry {
         file: "inscription.jpeg".into(),
-        ..Default::default()
+        ..default()
       }],
-      ..Default::default()
+      ..default()
     },
   )
 }
@@ -197,7 +207,7 @@ fn etch(
 fn batch(
   bitcoin_rpc_server: &test_bitcoincore_rpc::Handle,
   ord_rpc_server: &TestServer,
-  batchfile: Batchfile,
+  batchfile: batch::File,
 ) -> Etched {
   bitcoin_rpc_server.mine_blocks(1);
 
@@ -228,60 +238,93 @@ fn batch(
   bitcoin_rpc_server.mine_blocks(1);
 
   let block_height = bitcoin_rpc_server.height();
-  let block_hash = *bitcoin_rpc_server.state().hashes.last().unwrap();
-  let block_time = bitcoin_rpc_server.state().blocks[&block_hash].header.time;
 
   let id = RuneId {
-    block: u32::try_from(block_height).unwrap(),
+    block: block_height,
     tx: 1,
   };
 
   let reveal = inscribe.reveal;
   let parent = inscribe.inscriptions[0].id;
 
-  let Etch {
+  let batch::Etching {
     divisibility,
     premine,
     rune,
+    supply,
     symbol,
-    mint,
-  } = batchfile.etch.unwrap();
+    terms,
+  } = batchfile.etching.unwrap();
+
+  {
+    let supply = supply.to_integer(divisibility).unwrap();
+    let premine = premine.to_integer(divisibility).unwrap();
+
+    let mintable = terms
+      .map(|terms| terms.cap * terms.amount.to_integer(divisibility).unwrap())
+      .unwrap_or_default();
+
+    assert_eq!(supply, premine + mintable);
+  }
 
   let mut mint_definition = Vec::<String>::new();
 
-  if let Some(mint) = mint {
+  if let Some(terms) = terms {
     mint_definition.push("<dd>".into());
     mint_definition.push("<dl>".into());
 
     let mut mintable = true;
 
-    mint_definition.push("<dt>deadline</dt>".into());
-    if let Some(deadline) = mint.deadline {
-      mintable &= block_time < deadline;
-      mint_definition.push(format!(
-        "<dd><time>{}</time></dd>",
-        ord::timestamp(deadline)
-      ));
-    } else {
-      mint_definition.push("<dd>none</dd>".into());
+    mint_definition.push("<dt>start</dt>".into());
+    {
+      let relative = terms
+        .offset
+        .and_then(|range| range.start)
+        .map(|start| start + block_height);
+      let absolute = terms.height.and_then(|range| range.start);
+
+      let start = relative
+        .zip(absolute)
+        .map(|(relative, absolute)| relative.max(absolute))
+        .or(relative)
+        .or(absolute);
+
+      if let Some(start) = start {
+        mintable &= block_height + 1 >= start;
+        mint_definition.push(format!("<dd><a href=/block/{start}>{start}</a></dd>"));
+      } else {
+        mint_definition.push("<dd>none</dd>".into());
+      }
     }
 
     mint_definition.push("<dt>end</dt>".into());
+    {
+      let relative = terms
+        .offset
+        .and_then(|range| range.end)
+        .map(|end| end + block_height);
+      let absolute = terms.height.and_then(|range| range.end);
 
-    if let Some(term) = mint.term {
-      let end = block_height + u64::from(term);
-      mintable &= block_height + 1 < end;
-      mint_definition.push(format!("<dd><a href=/block/{end}>{end}</a></dd>"));
-    } else {
-      mint_definition.push("<dd>none</dd>".into());
+      let end = relative
+        .zip(absolute)
+        .map(|(relative, absolute)| relative.min(absolute))
+        .or(relative)
+        .or(absolute);
+
+      if let Some(end) = end {
+        mintable &= block_height + 1 < end;
+        mint_definition.push(format!("<dd><a href=/block/{end}>{end}</a></dd>"));
+      } else {
+        mint_definition.push("<dd>none</dd>".into());
+      }
     }
 
-    mint_definition.push("<dt>limit</dt>".into());
+    mint_definition.push("<dt>amount</dt>".into());
 
     mint_definition.push(format!(
       "<dd>{}</dd>",
       Pile {
-        amount: mint.limit.to_amount(divisibility).unwrap(),
+        amount: terms.amount.to_integer(divisibility).unwrap(),
         divisibility,
         symbol: Some(symbol),
       }
@@ -289,6 +332,10 @@ fn batch(
 
     mint_definition.push("<dt>mints</dt>".into());
     mint_definition.push("<dd>0</dd>".into());
+    mint_definition.push("<dt>cap</dt>".into());
+    mint_definition.push(format!("<dd>{}</dd>", terms.cap));
+    mint_definition.push("<dt>remaining</dt>".into());
+    mint_definition.push(format!("<dd>{}</dd>", terms.cap));
 
     mint_definition.push("<dt>mintable</dt>".into());
     mint_definition.push(format!("<dd>{mintable}</dd>"));
@@ -331,13 +378,13 @@ fn batch(
     ),
   );
 
-  let ord::wallet::inscribe::RuneInfo {
+  let batch::RuneInfo {
     destination,
     location,
     rune,
   } = inscribe.rune.clone().unwrap();
 
-  if premine.to_amount(divisibility).unwrap() > 0 {
+  if premine.to_integer(divisibility).unwrap() > 0 {
     let destination = destination
       .unwrap()
       .clone()
@@ -360,7 +407,7 @@ fn batch(
             <a href=/output/{location}>{location}</a>
           </td>
           <td class=monospace>
-            {premine}\u{00A0}{symbol}
+            {premine}\u{A0}{symbol}
           </td>
         </tr>
       </table>
@@ -407,4 +454,8 @@ fn envelope(payload: &[&[u8]]) -> Witness {
     .into_script();
 
   Witness::from_slice(&[script.into_bytes(), Vec::new()])
+}
+
+fn default<T: Default>() -> T {
+  Default::default()
 }

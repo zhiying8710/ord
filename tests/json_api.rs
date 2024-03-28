@@ -31,6 +31,7 @@ fn get_sat_without_sat_index() {
       satpoint: None,
       timestamp: 0,
       inscriptions: Vec::new(),
+      charms: vec![Charm::Uncommon],
     }
   )
 }
@@ -69,6 +70,7 @@ fn get_sat_with_inscription_and_sat_index() {
       satpoint: Some(SatPoint::from_str(&format!("{}:{}:{}", reveal, 0, 0)).unwrap()),
       timestamp: 1,
       inscriptions: vec![inscription_id],
+      charms: vec![Charm::Coin, Charm::Uncommon],
     }
   )
 }
@@ -125,6 +127,7 @@ fn get_sat_with_inscription_on_common_sat_and_more_inscriptions() {
       satpoint: Some(SatPoint::from_str(&format!("{}:{}:{}", reveal, 0, 0)).unwrap()),
       timestamp: 3,
       inscriptions: vec![inscription_id],
+      charms: Vec::new(),
     }
   )
 }
@@ -153,10 +156,11 @@ fn get_inscription() {
     inscription_json,
     api::Inscription {
       address: None,
-      charms: vec!["coin".into(), "uncommon".into()],
+      charms: vec![Charm::Coin, Charm::Uncommon],
       children: Vec::new(),
       content_length: Some(3),
       content_type: Some("text/plain;charset=utf-8".to_string()),
+      effective_content_type: Some("text/plain;charset=utf-8".to_string()),
       fee: 138,
       height: 2,
       id: inscription_id,
@@ -198,7 +202,7 @@ fn get_inscriptions() {
         (i * 3 + 2, 0, 0, witness.clone()),
         (i * 3 + 3, 0, 0, witness.clone()),
       ],
-      ..Default::default()
+      ..default()
     });
 
     inscriptions.push(InscriptionId { txid, index: 0 });
@@ -249,21 +253,21 @@ fn get_inscriptions_in_block() {
       (2, 0, 0, envelope.clone()),
       (3, 0, 0, envelope.clone()),
     ],
-    ..Default::default()
+    ..default()
   });
 
   bitcoin_rpc_server.mine_blocks(1);
 
   let _ = bitcoin_rpc_server.broadcast_tx(TransactionTemplate {
     inputs: &[(4, 0, 0, envelope.clone()), (5, 0, 0, envelope.clone())],
-    ..Default::default()
+    ..default()
   });
 
   bitcoin_rpc_server.mine_blocks(1);
 
   let _ = bitcoin_rpc_server.broadcast_tx(TransactionTemplate {
     inputs: &[(6, 0, 0, envelope.clone())],
-    ..Default::default()
+    ..default()
   });
 
   bitcoin_rpc_server.mine_blocks(1);
@@ -301,7 +305,7 @@ fn get_output() {
       (2, 0, 0, envelope.clone()),
       (3, 0, 0, envelope.clone()),
     ],
-    ..Default::default()
+    ..default()
   });
 
   bitcoin_rpc_server.mine_blocks(1);
@@ -543,16 +547,18 @@ fn get_runes() {
     rune_json,
     api::Rune {
       entry: RuneEntry {
+        block: a.id.block,
         burned: 0,
-        mint: None,
+        terms: None,
         divisibility: 0,
         etching: a.inscribe.reveal,
         mints: 0,
         number: 0,
         premine: 1000,
-        rune: Rune(RUNE),
-        spacers: 0,
-        supply: 1000,
+        spaced_rune: SpacedRune {
+          rune: Rune(RUNE),
+          spacers: 0
+        },
         symbol: Some('¢'),
         timestamp: 11,
       },
@@ -578,16 +584,18 @@ fn get_runes() {
         (
           RuneId { block: 11, tx: 1 },
           RuneEntry {
+            block: a.id.block,
             burned: 0,
-            mint: None,
+            terms: None,
             divisibility: 0,
             etching: a.inscribe.reveal,
             mints: 0,
             number: 0,
             premine: 1000,
-            rune: Rune(RUNE),
-            spacers: 0,
-            supply: 1000,
+            spaced_rune: SpacedRune {
+              rune: Rune(RUNE),
+              spacers: 0
+            },
             symbol: Some('¢'),
             timestamp: 11,
           }
@@ -595,16 +603,18 @@ fn get_runes() {
         (
           RuneId { block: 19, tx: 1 },
           RuneEntry {
+            block: b.id.block,
             burned: 0,
-            mint: None,
+            terms: None,
             divisibility: 0,
             etching: b.inscribe.reveal,
             mints: 0,
             number: 1,
             premine: 1000,
-            rune: Rune(RUNE + 1),
-            spacers: 0,
-            supply: 1000,
+            spaced_rune: SpacedRune {
+              rune: Rune(RUNE + 1),
+              spacers: 0
+            },
             symbol: Some('¢'),
             timestamp: 19,
           }
@@ -612,16 +622,18 @@ fn get_runes() {
         (
           RuneId { block: 27, tx: 1 },
           RuneEntry {
+            block: c.id.block,
             burned: 0,
-            mint: None,
+            terms: None,
             divisibility: 0,
             etching: c.inscribe.reveal,
             mints: 0,
             number: 2,
             premine: 1000,
-            rune: Rune(RUNE + 2),
-            spacers: 0,
-            supply: 1000,
+            spaced_rune: SpacedRune {
+              rune: Rune(RUNE + 2),
+              spacers: 0
+            },
             symbol: Some('¢'),
             timestamp: 27,
           }

@@ -79,7 +79,7 @@ impl Settings {
     };
 
     let config = if let Some(config_path) = config_path {
-      serde_yaml::from_reader(File::open(&config_path).context(anyhow!(
+      serde_yaml::from_reader(fs::File::open(&config_path).context(anyhow!(
         "failed to open config file `{}`",
         config_path.display()
       ))?)
@@ -654,7 +654,7 @@ mod tests {
       Settings::merge(
         Options {
           bitcoin_rpc_username: Some("foo".into()),
-          ..Default::default()
+          ..default()
         },
         Default::default(),
       )
@@ -670,7 +670,7 @@ mod tests {
       Settings::merge(
         Options {
           bitcoin_rpc_password: Some("foo".into()),
-          ..Default::default()
+          ..default()
         },
         Default::default(),
       )
@@ -964,7 +964,7 @@ mod tests {
     let config = Settings {
       bitcoin_rpc_username: Some("config_user".into()),
       bitcoin_rpc_password: Some("config_pass".into()),
-      ..Default::default()
+      ..default()
     };
 
     let tempdir = TempDir::new().unwrap();
@@ -979,7 +979,7 @@ mod tests {
           bitcoin_rpc_username: Some("option_user".into()),
           bitcoin_rpc_password: Some("option_pass".into()),
           config: Some(config_path.clone()),
-          ..Default::default()
+          ..default()
         },
         vec![
           ("BITCOIN_RPC_USERNAME".into(), "env_user".into()),
@@ -998,7 +998,7 @@ mod tests {
       Settings::merge(
         Options {
           config: Some(config_path.clone()),
-          ..Default::default()
+          ..default()
         },
         vec![
           ("BITCOIN_RPC_USERNAME".into(), "env_user".into()),
@@ -1017,7 +1017,7 @@ mod tests {
       Settings::merge(
         Options {
           config: Some(config_path),
-          ..Default::default()
+          ..default()
         },
         Default::default(),
       )
@@ -1038,7 +1038,7 @@ mod tests {
 
   #[test]
   fn example_config_file_is_valid() {
-    let _: Settings = serde_yaml::from_reader(File::open("ord.yaml").unwrap()).unwrap();
+    let _: Settings = serde_yaml::from_reader(fs::File::open("ord.yaml").unwrap()).unwrap();
   }
 
   #[test]
@@ -1194,7 +1194,7 @@ mod tests {
 
     let config = Settings {
       index: Some("config".into()),
-      ..Default::default()
+      ..default()
     };
 
     let tempdir = TempDir::new().unwrap();
