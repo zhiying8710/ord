@@ -134,6 +134,17 @@ impl Rest {
     )
   }
 
+  pub async fn parse_rune(
+    Extension(server_config): Extension<Arc<ServerConfig>>,
+    Extension(index): Extension<Arc<Index>>,
+    Path(txid): Path<Txid>,
+  ) -> ServerResult<Json<Option<Runestone>>> {
+    let tx = index.get_raw_transaction(txid)?.unwrap();
+    Ok(
+      Json(Runestone::from_transaction(&tx))
+    )
+  }
+
   fn _output(
     outpoint: OutPoint,
     index: &Arc<Index>,
@@ -217,8 +228,6 @@ fn _get_inscription(
   index: &Arc<Index>,
   query: query::Inscription,
 ) -> Result<Value, ServerError>{
-  let info = Index::inscription_info(&index, query)?
-        .ok_or_not_found(|| format!("inscription {query}"))?;
   let info = Index::inscription_info(&index, query)?.ok_or_not_found(|| format!("inscription {query}"))?;
 
   let raw_tx = index.get_raw_transaction(info.entry.id.txid)?;
@@ -235,12 +244,6 @@ fn _get_inscription(
     content = general_purpose::STANDARD.encode(&_body);
   }
 
-  let charms: Vec<String> = Charm::ALL
-  .iter()
-  .filter(|charm| charm.is_set(info.charms))
-  .map(|charm| charm.title().to_owned())
-  .collect();
-
   Ok(
     json!({
       "genesis_fee": info.entry.fee,
@@ -249,7 +252,7 @@ fn _get_inscription(
       "content_type": info.inscription.content_type().map(|s| s.to_string()),
       "content": content,
       "inscription_id": info.entry.id,
-      "charms": charms,
+      "charms": Charm::charms(info.entry.charms),
       "address": info
       .output
       .as_ref()

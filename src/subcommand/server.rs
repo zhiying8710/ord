@@ -179,7 +179,7 @@ impl Server {
         decompress: self.decompress,
         domain: acme_domains.first().cloned(),
         index_sats: index.has_sat_index(),
-        json_api_enabled: !self.disable_json_api,
+        json_api_enabled: true,
       });
 
       let router = Router::new()
@@ -271,6 +271,7 @@ impl Server {
         .route("/rest/tx/inscription/:txid", get(Rest::parse_inscriptions))
         .route("/rest/witness/inscription", post(Rest::parse_inscriptions_from_witness))
         .route("/rest/outputs", post(Rest::outputs))
+        .route("/rest/rune/:txid", get(Rest::parse_rune))
 
         .fallback(Self::fallback)
         .layer(Extension(index))
