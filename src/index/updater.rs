@@ -626,7 +626,12 @@ impl<'index> Updater<'index> {
       };
 
       for (i, (tx, txid)) in block.txdata.iter().enumerate() {
-        rune_updater.index_runes(u32::try_from(i).unwrap(), tx, *txid)?;
+        let rune_tx = rune_updater.index_runes(u32::try_from(i).unwrap(), tx, *txid)?;
+        if let Some(mut rune_txs) = rune_txs.clone() {
+          if let Some(rune_tx) = rune_tx {
+            rune_txs.push(rune_tx);
+          }
+        }
       }
 
       rune_updater.update()?;
@@ -640,13 +645,13 @@ impl<'index> Updater<'index> {
     if let Some(inscription_tx_push_url) = self.index.settings.inscription_tx_push_url() {
       if let Some(mut inscription_txs) = inscription_txs {
         let tx_count = inscription_txs.len();
-        if tx_count > 0 || self.index.settings.inscription_tx_push_on_empty() {
+        if tx_count > 0 || self.index.settings.push_on_empty() {
           let push_start = Instant::now();
           // push mark data to server let it know that this block has no inscription txs
-          if self.index.settings.inscription_tx_push_on_empty() && tx_count == 0 {
+          if self.index.settings.push_on_empty() && tx_count == 0 {
             log::info!("Will push empty mark data to server on height {}", self.height - 1);
             inscription_txs.push(json!({
-              "inscription_id": "EMPTY_MARK",
+              "empty_mark": true,
               "block": self.height - 1, // self.height has already plus 1
             }));
           }
@@ -690,6 +695,65 @@ impl<'index> Updater<'index> {
           } else {
             log::info!(
               "Detected reorg, do not push inscription txs to server an let ord server do its work"
+            )
+          }
+        }
+      }
+    }
+
+    if let Some(rune_tx_push_url) = self.index.settings.rune_tx_push_url() {
+      if let Some(mut rune_txs) = rune_txs.clone() {
+        let tx_count = rune_txs.len();
+        if tx_count > 0 || self.index.settings.push_on_empty() {
+          let push_start = Instant::now();
+          // push mark data to server let it know that this block has no inscription txs
+          if self.index.settings.push_on_empty() && tx_count == 0 {
+            log::info!("Will push empty mark data to server on height {}", self.height - 1);
+            rune_txs.push(json!({
+              "empty_mark": true,
+              "block": self.height - 1, // self.height has already plus 1
+            }));
+          }
+          let data = Value::Array(rune_txs);
+          let mut reorg = false;
+
+          loop {
+              match self.index.block_hash(self.height.checked_sub(1))? {
+                Some(index_prev_blockhash) => {
+                  reorg = index_prev_blockhash != block.header.prev_blockhash;
+                }
+                _ => {}
+              }
+              if reorg {
+                  break;
+              }
+              match self.push_request(&rune_tx_push_url, &data) {
+                Ok(_response) => {
+                  /* it worked */
+                  break;
+                },
+                Err(Error::Status(_code, _response)) => {
+                    /* the server returned an unexpected status
+                      code (such as 400, 500 etc) */
+                    log::error!("index server response with code {_code}, retry.");
+                }
+                Err(_err) => {
+                  /* some kind of io/transport error */
+                  log::error!("index server response exception, err: {_err}, retry.");
+                }
+              }
+
+              sleep(PUSH_BACKOFF_FACTOR);
+          }
+          if !reorg {
+            log::info!(
+              "Pushed {} rune txs to server in {} ms",
+              tx_count,
+              (Instant::now() - push_start).as_millis(),
+            );
+          } else {
+            log::info!(
+              "Detected reorg, do not push rune txs to server an let ord server do its work"
             )
           }
         }

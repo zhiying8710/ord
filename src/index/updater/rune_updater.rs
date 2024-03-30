@@ -1,6 +1,7 @@
 use {
   super::*,
   crate::runes::{Edict, Runestone},
+  serde_json::{Value, json},
 };
 
 struct Mint {
@@ -16,6 +17,80 @@ struct Etched {
   symbol: Option<char>,
   terms: Option<Terms>,
 }
+
+pub(super) struct RuneTx {
+  pub block: u32,
+  pub txid: Txid,
+  pub tx_index: u32,
+  pub runestone: Runestone,
+  pub pointer: u32,
+  pub entries: HashMap<RuneId, RuneTxEntry>,
+  pub burned: HashMap<RuneId, u128>,
+}
+
+impl RuneTx {
+  pub fn new(
+      block: u32,
+      txid: Txid,
+      tx_index: u32,
+      runestone: Runestone,
+      pointer: u32,
+      entries: HashMap<RuneId, RuneTxEntry>,
+      burned: HashMap<RuneId, u128>,
+  ) -> Self {
+      Self {
+          block,
+          txid,
+          tx_index,
+          runestone,
+          pointer,
+          entries,
+          burned,
+      }
+  }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
+pub(super) struct RuneTxEntry {
+  pub burned: u128,
+  pub divisibility: u8,
+  pub etching: Txid,
+  pub mints: u128,
+  pub number: u64,
+  pub premine: u128,
+  pub spaced_rune: SpacedRune,
+  pub symbol: Option<char>,
+  pub terms: Option<Terms>,
+  pub timestamp: u64,
+  pub mintable: bool,
+  pub supply: u128,
+  pub start: Option<u64>,
+  pub end: Option<u64>,
+}
+
+impl RuneTxEntry {
+
+  fn load(rune_entry: &RuneEntry, current_block: u32) -> Self {
+    Self {
+      burned: rune_entry.burned,
+      divisibility: rune_entry.divisibility,
+      etching: rune_entry.etching,
+      mints: rune_entry.mints,
+      number: rune_entry.number,
+      premine: rune_entry.premine,
+      spaced_rune: rune_entry.spaced_rune,
+      symbol: rune_entry.symbol,
+      terms: rune_entry.terms,
+      timestamp: rune_entry.timestamp,
+      mintable: rune_entry.mintable(current_block as u64).is_ok(),
+      supply: rune_entry.supply(),
+      start: rune_entry.start(),
+      end: rune_entry.end(),
+    }
+  }
+
+}
+
 
 pub(super) struct RuneUpdater<'a, 'tx, 'client> {
   pub(super) block_time: u32,
@@ -34,8 +109,12 @@ pub(super) struct RuneUpdater<'a, 'tx, 'client> {
 }
 
 impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
-  pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid) -> Result<()> {
+  pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid) -> Result<Option<Value>> {
+
     let runestone = Runestone::from_transaction(tx);
+    if runestone.is_none() {
+        return Ok(None);
+    }
 
     let mut unallocated = self.unallocated(tx)?;
 
@@ -47,19 +126,23 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     let pointer = runestone.as_ref().and_then(|runestone| runestone.pointer);
 
     let mut allocated: Vec<HashMap<RuneId, u128>> = vec![HashMap::new(); tx.output.len()];
+    let mut entry_ids: HashSet<RuneId> = HashSet::new();
 
     if let Some(runestone) = runestone {
+
       if let Some(mint) = runestone
         .mint
         .and_then(|id| self.mint(id).transpose())
         .transpose()?
       {
+        entry_ids.insert(mint.id);
         *unallocated.entry(mint.id).or_default() += mint.amount;
       }
 
       let etched = self.etched(tx_index, tx, &runestone)?;
 
       if let Some(Etched { id, premine, .. }) = etched {
+        entry_ids.insert(id);
         *unallocated.entry(id).or_default() += premine;
       }
 
@@ -79,6 +162,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
           } else {
             id
           };
+          entry_ids.insert(id);
 
           let Some(balance) = unallocated.get_mut(&id) else {
             continue;
@@ -134,14 +218,17 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       }
 
       if let Some(etched) = etched {
+        entry_ids.insert(etched.id);
         self.create_rune_entry(txid, cenotaph, etched)?;
       }
     }
 
     let mut burned: HashMap<RuneId, u128> = HashMap::new();
+    let mut real_pointer: u32 = 0;
 
     if cenotaph {
       for (id, balance) in unallocated {
+        entry_ids.insert(id);
         *burned.entry(id).or_default() += balance;
       }
     } else {
@@ -159,13 +246,17 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
             .map(|(vout, _tx_out)| vout)
         })
       {
+        real_pointer = vout.try_into().unwrap();
         for (id, balance) in unallocated {
+          entry_ids.insert(id);
           if balance > 0 {
             *allocated[vout].entry(id).or_default() += balance;
           }
         }
       } else {
+        real_pointer = u32::MAX;
         for (id, balance) in unallocated {
+          entry_ids.insert(id);
           if balance > 0 {
             *burned.entry(id).or_default() += balance;
           }
@@ -196,6 +287,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       balances.sort();
 
       for (id, balance) in balances {
+        entry_ids.insert(id);
         id.encode_balance(balance, &mut buffer);
       }
 
@@ -210,11 +302,64 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     }
 
     // increment entries with burned runes
-    for (id, amount) in burned {
+    for (id, amount) in burned.clone() {
+      entry_ids.insert(id);
       *self.burned.entry(id).or_default() += amount;
     }
 
-    Ok(())
+    let mut rune_entries: HashMap<RuneId, RuneEntry> = entry_ids.into_iter().map(|id| {
+      (id, RuneEntry::load(self.id_to_entry.get(&id.store()).unwrap().unwrap().value()))
+    }).collect();
+
+    let outputs: Vec<Vec<(SpacedRune, Pile)>>  = tx.output.clone().into_iter()
+    .enumerate()
+    .map(|(vout, _)| {
+      let x = self.get_rune_balances_for_outpoint(OutPoint {
+        txid,
+        vout: vout.try_into().unwrap(),
+      }).unwrap();
+      return x;
+    }).collect();
+
+    let entries: HashMap<RuneId, RuneTxEntry> = rune_entries.iter().map(|(k, v)| (*k, RuneTxEntry::load(v, self.height))).collect();
+
+    Ok(Some(json!({
+      "block": self.height,
+      "txid": txid,
+      "tx_index": tx_index,
+      "runestone": Runestone::from_transaction(tx),
+      "pointer": real_pointer,
+      "entries": entries,
+      "burned": burned.clone(),
+      "outputs": outputs
+    })))
+  }
+
+  pub(super) fn get_rune_balances_for_outpoint(&mut self, outpoint: OutPoint,) -> Result<Vec<(SpacedRune, Pile)>>{
+    let Some(balances) = self.outpoint_to_balances.get(&outpoint.store())? else {
+      return Ok(Vec::new());
+    };
+    let balances_buffer = balances.value();
+
+    let mut balances = Vec::new();
+    let mut i = 0;
+    while i < balances_buffer.len() {
+      let ((id, amount), length) = RuneId::decode_balance(&balances_buffer[i..]).unwrap();
+      i += length;
+
+      let entry = RuneEntry::load(self.id_to_entry.get(id.store())?.unwrap().value());
+
+      balances.push((
+        entry.spaced_rune,
+        Pile {
+          amount,
+          divisibility: entry.divisibility,
+          symbol: entry.symbol,
+        },
+      ));
+    }
+
+    Ok(balances)
   }
 
   pub(super) fn update(self) -> Result {

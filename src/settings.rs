@@ -28,7 +28,7 @@ pub struct Settings {
   server_url: Option<String>,
   server_username: Option<String>,
   inscription_tx_push_url: Option<String>,
-  inscription_tx_push_on_empty: bool,
+  push_on_empty: bool,
   push_only_first_transfer: bool,
   target_protocol: Option<String>,
 
@@ -151,7 +151,7 @@ impl Settings {
         Some(url) => Some(url.to_string()),
         None => None
       },
-      inscription_tx_push_on_empty: source.inscription_tx_push_on_empty,
+      push_on_empty: source.push_on_empty,
       push_only_first_transfer: source.push_only_first_transfer,
       target_protocol: source.target_protocol,
 
@@ -194,7 +194,7 @@ impl Settings {
         Some(url) => Some(url.to_string()),
         None => None
       },
-      inscription_tx_push_on_empty: options.inscription_tx_push_on_empty,
+      push_on_empty: options.push_on_empty,
       push_only_first_transfer: options.push_only_first_transfer,
       target_protocol: options.target_protocol,
       rune_tx_push_url: match &options.rune_tx_push_url {
@@ -280,7 +280,7 @@ impl Settings {
       server_url: get_string("SERVER_URL"),
       server_username: get_string("SERVER_USERNAME"),
       inscription_tx_push_url: get_string("INSCRIPTION_TX_PUSH_URL"),
-      inscription_tx_push_on_empty: get_bool("INSCRIPTION_TX_PUSH_ON_EMPTY"),
+      push_on_empty: get_bool("push_on_empty"),
       push_only_first_transfer: get_bool("PUSH_ONLY_FIRST_TRANSFER"),
       target_protocol: get_string("TARGET_PROTOCOL"),
 
@@ -315,7 +315,7 @@ impl Settings {
       server_url: Some(server_url.into()),
       server_username: None,
       inscription_tx_push_url: None,
-      inscription_tx_push_on_empty: false,
+      push_on_empty: false,
       push_only_first_transfer: false,
       target_protocol: None,
 
@@ -400,7 +400,7 @@ impl Settings {
       server_url: self.server_url,
       server_username: self.server_username,
       inscription_tx_push_url: self.inscription_tx_push_url,
-      inscription_tx_push_on_empty: self.inscription_tx_push_on_empty,
+      push_on_empty: self.push_on_empty,
       push_only_first_transfer: self.push_only_first_transfer,
       target_protocol: self.target_protocol,
 
@@ -602,8 +602,8 @@ impl Settings {
     self.inscription_tx_push_url.clone()
   }
 
-  pub(crate) fn inscription_tx_push_on_empty(&self) -> bool {
-    self.inscription_tx_push_on_empty
+  pub(crate) fn push_on_empty(&self) -> bool {
+    self.push_on_empty
   }
 
   pub(crate) fn push_only_first_transfer(&self) -> bool {
@@ -1112,7 +1112,7 @@ mod tests {
         server_url: Some("server url".into()),
         server_username: Some("server username".into()),
         inscription_tx_push_url: None,
-        inscription_tx_push_on_empty: false,
+        push_on_empty: false,
         push_only_first_transfer: false,
         target_protocol: None,
         rune_tx_push_url: None,
@@ -1177,7 +1177,7 @@ mod tests {
         server_url: None,
         server_username: Some("server username".into()),
         inscription_tx_push_url: None,
-        inscription_tx_push_on_empty: false,
+        push_on_empty: false,
         push_only_first_transfer: false,
         target_protocol: None,
         rune_tx_push_url: None,
