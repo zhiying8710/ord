@@ -109,11 +109,11 @@ pub(super) struct RuneUpdater<'a, 'tx, 'client> {
 }
 
 impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
-  pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid) -> Result<Option<Value>> {
+  pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid, rune_txs: &mut Option<Vec<Value>>) -> Result {
 
     let runestone = Runestone::from_transaction(tx);
     if runestone.is_none() {
-        return Ok(None);
+        return Ok(());
     }
 
     let mut unallocated = self.unallocated(tx)?;
@@ -307,10 +307,6 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       *self.burned.entry(id).or_default() += amount;
     }
 
-    let mut rune_entries: HashMap<RuneId, RuneEntry> = entry_ids.into_iter().map(|id| {
-      (id, RuneEntry::load(self.id_to_entry.get(&id.store()).unwrap().unwrap().value()))
-    }).collect();
-
     let outputs: Vec<Vec<(SpacedRune, Pile)>>  = tx.output.clone().into_iter()
     .enumerate()
     .map(|(vout, _)| {
@@ -321,9 +317,13 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       return x;
     }).collect();
 
+    let rune_entries: HashMap<RuneId, RuneEntry> = entry_ids.into_iter().map(|id| {
+      (id, RuneEntry::load(self.id_to_entry.get(&id.store()).unwrap().unwrap().value()))
+    }).collect();
+
     let entries: HashMap<RuneId, RuneTxEntry> = rune_entries.iter().map(|(k, v)| (*k, RuneTxEntry::load(v, self.height))).collect();
 
-    Ok(Some(json!({
+    log::info!("Parsed rune tx: {:?}", json!({
       "block": self.height,
       "txid": txid,
       "tx_index": tx_index,
@@ -332,7 +332,22 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       "entries": entries,
       "burned": burned.clone(),
       "outputs": outputs
-    })))
+    }));
+
+    if let Some(rune_txs) = rune_txs {
+      rune_txs.push(json!({
+        "block": self.height,
+        "txid": txid,
+        "tx_index": tx_index,
+        "runestone": Runestone::from_transaction(tx),
+        "pointer": real_pointer,
+        "entries": entries,
+        "burned": burned.clone(),
+        "outputs": outputs
+      }));
+    }
+
+    Ok(())
   }
 
   pub(super) fn get_rune_balances_for_outpoint(&mut self, outpoint: OutPoint,) -> Result<Vec<(SpacedRune, Pile)>>{

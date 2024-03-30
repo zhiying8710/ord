@@ -626,13 +626,7 @@ impl<'index> Updater<'index> {
       };
 
       for (i, (tx, txid)) in block.txdata.iter().enumerate() {
-        let rune_tx = rune_updater.index_runes(u32::try_from(i).unwrap(), tx, *txid)?;
-        log::info!("Parsed rune tx: {:?}", rune_tx);
-        if let Some(mut rune_txs) = rune_txs.clone() {
-          if let Some(rune_tx) = rune_tx {
-            rune_txs.push(rune_tx);
-          }
-        }
+        rune_updater.index_runes(u32::try_from(i).unwrap(), tx, *txid, &mut rune_txs)?;
       }
 
       rune_updater.update()?;
