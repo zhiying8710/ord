@@ -18,37 +18,37 @@ struct Etched {
   terms: Option<Terms>,
 }
 
-pub(super) struct RuneTx {
-  pub block: u32,
-  pub txid: Txid,
-  pub tx_index: u32,
-  pub runestone: Runestone,
-  pub pointer: u32,
-  pub entries: HashMap<RuneId, RuneTxEntry>,
-  pub burned: HashMap<RuneId, u128>,
-}
+// pub(super) struct RuneTx {
+//   pub block: u32,
+//   pub txid: Txid,
+//   pub tx_index: u32,
+//   pub runestone: Runestone,
+//   pub pointer: u32,
+//   pub entries: HashMap<RuneId, RuneTxEntry>,
+//   pub burned: HashMap<RuneId, u128>,
+// }
 
-impl RuneTx {
-  pub fn new(
-      block: u32,
-      txid: Txid,
-      tx_index: u32,
-      runestone: Runestone,
-      pointer: u32,
-      entries: HashMap<RuneId, RuneTxEntry>,
-      burned: HashMap<RuneId, u128>,
-  ) -> Self {
-      Self {
-          block,
-          txid,
-          tx_index,
-          runestone,
-          pointer,
-          entries,
-          burned,
-      }
-  }
-}
+// impl RuneTx {
+//   pub fn new(
+//       block: u32,
+//       txid: Txid,
+//       tx_index: u32,
+//       runestone: Runestone,
+//       pointer: u32,
+//       entries: HashMap<RuneId, RuneTxEntry>,
+//       burned: HashMap<RuneId, u128>,
+//   ) -> Self {
+//       Self {
+//           block,
+//           txid,
+//           tx_index,
+//           runestone,
+//           pointer,
+//           entries,
+//           burned,
+//       }
+//   }
+// }
 
 #[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub(super) struct RuneTxEntry {
