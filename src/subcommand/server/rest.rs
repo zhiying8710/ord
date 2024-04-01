@@ -138,10 +138,10 @@ impl Rest {
     Extension(server_config): Extension<Arc<ServerConfig>>,
     Extension(index): Extension<Arc<Index>>,
     Path(txid): Path<Txid>,
-  ) -> ServerResult<Json<Option<Runestone>>> {
+  ) -> ServerResult<Json<Option<Artifact>>> {
     let tx = index.get_raw_transaction(txid)?.unwrap();
     Ok(
-      Json(Runestone::from_transaction(&tx))
+      Json(Runestone::decipher(&tx).unwrap())
     )
   }
 

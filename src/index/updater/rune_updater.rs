@@ -1,54 +1,4 @@
-use {
-  super::*,
-  crate::runes::{Edict, Runestone},
-  serde_json::{Value, json},
-};
-
-struct Mint {
-  id: RuneId,
-  amount: u128,
-}
-
-struct Etched {
-  divisibility: u8,
-  id: RuneId,
-  premine: u128,
-  spaced_rune: SpacedRune,
-  symbol: Option<char>,
-  terms: Option<Terms>,
-}
-
-// pub(super) struct RuneTx {
-//   pub block: u32,
-//   pub txid: Txid,
-//   pub tx_index: u32,
-//   pub runestone: Runestone,
-//   pub pointer: u32,
-//   pub entries: HashMap<RuneId, RuneTxEntry>,
-//   pub burned: HashMap<RuneId, u128>,
-// }
-
-// impl RuneTx {
-//   pub fn new(
-//       block: u32,
-//       txid: Txid,
-//       tx_index: u32,
-//       runestone: Runestone,
-//       pointer: u32,
-//       entries: HashMap<RuneId, RuneTxEntry>,
-//       burned: HashMap<RuneId, u128>,
-//   ) -> Self {
-//       Self {
-//           block,
-//           txid,
-//           tx_index,
-//           runestone,
-//           pointer,
-//           entries,
-//           burned,
-//       }
-//   }
-// }
+use super::*;
 
 #[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub(super) struct RuneTxEntry {
@@ -91,8 +41,6 @@ impl RuneTxEntry {
 
 }
 
-use super::*;
-
 pub(super) struct RuneUpdater<'a, 'tx, 'client> {
   pub(super) block_time: u32,
   pub(super) burned: HashMap<RuneId, Lot>,
@@ -110,55 +58,31 @@ pub(super) struct RuneUpdater<'a, 'tx, 'client> {
 }
 
 impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
-  pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid, rune_txs: &mut Option<Vec<Value>>) -> Result {
-
-    let runestone = Runestone::from_transaction(tx);
-    if runestone.is_none() {
+  pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid, rune_txs: &mut Option<Vec<Value>>) -> Result<()> {
+    let artifact = Runestone::decipher(tx)?;
+    if artifact.is_none() {
         return Ok(());
     }
-  pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid) -> Result<()> {
-    let artifact = Runestone::decipher(tx)?;
 
     let mut unallocated = self.unallocated(tx)?;
 
-    let cenotaph = runestone
-      .as_ref()
-      .map(|runestone| runestone.cenotaph)
-      .unwrap_or_default();
-
-    let pointer = runestone.as_ref().and_then(|runestone| runestone.pointer);
-
-    let mut allocated: Vec<HashMap<RuneId, u128>> = vec![HashMap::new(); tx.output.len()];
-    let mut entry_ids: HashSet<RuneId> = HashSet::new();
     let mut allocated: Vec<HashMap<RuneId, Lot>> = vec![HashMap::new(); tx.output.len()];
 
-    if let Some(runestone) = runestone {
+    let mut entry_ids: HashSet<RuneId> = HashSet::new();
 
-      if let Some(mint) = runestone
-        .mint
-        .and_then(|id| self.mint(id).transpose())
-        .transpose()?
-      {
-        entry_ids.insert(mint.id);
-        *unallocated.entry(mint.id).or_default() += mint.amount;
     if let Some(artifact) = &artifact {
       if let Some(id) = artifact.mint() {
         if let Some(amount) = self.mint(id)? {
+          entry_ids.insert(id);
           *unallocated.entry(id).or_default() += amount;
         }
       }
 
       let etched = self.etched(tx_index, tx, artifact)?;
 
-      if let Some(Etched { id, premine, .. }) = etched {
-        entry_ids.insert(id);
-        *unallocated.entry(id).or_default() += premine;
-      }
-
-      if !cenotaph {
-        for Edict { id, amount, output } in runestone.edicts {
       if let Artifact::Runestone(runestone) = artifact {
         if let Some((id, ..)) = etched {
+          entry_ids.insert(id);
           *unallocated.entry(id).or_default() +=
             runestone.etching.unwrap().premine.unwrap_or_default();
         }
@@ -235,17 +159,14 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
         }
       }
 
-      if let Some(etched) = etched {
-        entry_ids.insert(etched.id);
-        self.create_rune_entry(txid, cenotaph, etched)?;
       if let Some((id, rune)) = etched {
+        entry_ids.insert(id);
         self.create_rune_entry(txid, artifact, id, rune)?;
       }
     }
 
-    let mut burned: HashMap<RuneId, u128> = HashMap::new();
-    let mut real_pointer: u32 = 0;
     let mut burned: HashMap<RuneId, Lot> = HashMap::new();
+    let mut real_pointer: u32 = 0;
 
     if let Some(Artifact::Cenotaph(_)) = artifact {
       for (id, balance) in unallocated {
@@ -302,6 +223,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       // increment burned balances
       if tx.output[vout].script_pubkey.is_op_return() {
         for (id, balance) in &balances {
+          entry_ids.insert(id.to_owned());
           *burned.entry(*id).or_default() += *balance;
         }
         continue;
@@ -316,7 +238,6 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
 
       for (id, balance) in balances {
         entry_ids.insert(id);
-        id.encode_balance(balance, &mut buffer);
         Index::encode_rune_balance(id, balance.n(), &mut buffer);
       }
 
@@ -356,7 +277,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       "block": self.height,
       "txid": txid,
       "tx_index": tx_index,
-      "runestone": Runestone::from_transaction(tx),
+      "runestone": Runestone::decipher(tx)?.unwrap(),
       "pointer": real_pointer,
       "entries": entries,
       "burned": burned.clone(),
@@ -368,7 +289,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
         "block": self.height,
         "txid": txid,
         "tx_index": tx_index,
-        "runestone": Runestone::from_transaction(tx),
+        "runestone": Runestone::decipher(tx)?.unwrap(),
         "pointer": real_pointer,
         "entries": entries,
         "burned": burned.clone(),
@@ -388,7 +309,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     let mut balances = Vec::new();
     let mut i = 0;
     while i < balances_buffer.len() {
-      let ((id, amount), length) = RuneId::decode_balance(&balances_buffer[i..]).unwrap();
+      let ((id, amount), length) = Index::decode_rune_balance(&balances_buffer[i..]).unwrap();
       i += length;
 
       let entry = RuneEntry::load(self.id_to_entry.get(id.store())?.unwrap().value());
