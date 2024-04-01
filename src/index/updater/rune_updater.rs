@@ -82,7 +82,7 @@ impl RuneTxEntry {
       symbol: rune_entry.symbol,
       terms: rune_entry.terms,
       timestamp: rune_entry.timestamp,
-      mintable: rune_entry.mintable(current_block as u64).is_ok(),
+      mintable: rune_entry.mintable(current_block as u64 + 1).is_ok(),
       supply: rune_entry.supply(),
       start: rune_entry.start(),
       end: rune_entry.end(),
