@@ -25,7 +25,6 @@ use {
     },
     into_usize::IntoUsize,
     representation::Representation,
-    runes::Terms,
     settings::Settings,
     subcommand::{Subcommand, SubcommandResult},
     tally::Tally,
@@ -41,10 +40,8 @@ use {
     consensus::{self, Decodable, Encodable},
     hash_types::{BlockHash, TxMerkleNode},
     hashes::Hash,
-    opcodes,
-    script::{self, Instruction},
-    Amount, Block, Network, OutPoint, Script, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
-    Witness,
+    script, Amount, Block, Network, OutPoint, Script, ScriptBuf, Sequence, Transaction, TxIn,
+    TxOut, Txid, Witness,
   },
   bitcoincore_rpc::{Client, RpcApi},
   chrono::{DateTime, TimeZone, Utc},
@@ -53,7 +50,10 @@ use {
   html_escaper::{Escape, Trusted},
   http::HeaderMap,
   lazy_static::lazy_static,
-  ordinals::{Charm, Epoch, Height, Rarity, Sat, SatPoint},
+  ordinals::{
+    varint, Artifact, Charm, Edict, Epoch, Etching, Height, Pile, Rarity, Rune, RuneId, Runestone,
+    Sat, SatPoint, SpacedRune, Terms,
+  },
   regex::Regex,
   reqwest::Url,
   serde::{Deserialize, Deserializer, Serialize},
@@ -88,7 +88,6 @@ pub use self::{
   inscriptions::{Envelope, Inscription, InscriptionId},
   object::Object,
   options::Options,
-  runes::{Edict, Pile, Rune, RuneId, Runestone, SpacedRune},
   wallet::transaction_builder::{Target, TransactionBuilder},
 };
 
@@ -98,15 +97,6 @@ mod test;
 
 #[cfg(test)]
 use self::test::*;
-
-macro_rules! tprintln {
-  ($($arg:tt)*) => {
-    if cfg!(test) {
-      eprint!("==> ");
-      eprintln!($($arg)*);
-    }
-  };
-}
 
 pub mod api;
 pub mod arguments;
@@ -118,6 +108,7 @@ mod fee_rate;
 pub mod index;
 mod inscriptions;
 mod into_usize;
+mod macros;
 mod object;
 pub mod options;
 pub mod outgoing;
@@ -132,7 +123,6 @@ pub mod wallet;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
-const RUNE_COMMIT_INTERVAL: u32 = 6;
 const TARGET_POSTAGE: Amount = Amount::from_sat(10_000);
 
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
@@ -243,13 +233,12 @@ fn gracefully_shutdown_indexer() {
 
 pub fn main() {
   env_logger::init();
-
   ctrlc::set_handler(move || {
     if SHUTTING_DOWN.fetch_or(true, atomic::Ordering::Relaxed) {
       process::exit(1);
     }
 
-    println!("Shutting down gracefully. Press <CTRL-C> again to shutdown immediately.");
+    eprintln!("Shutting down gracefully. Press <CTRL-C> again to shutdown immediately.");
 
     LISTENERS
       .lock()

@@ -2,10 +2,11 @@ use {
   super::*,
   crate::wallet::{batch, Wallet},
   bitcoincore_rpc::bitcoincore_rpc_json::ListDescriptorsResult,
-  reqwest::Url,
+  shared_args::SharedArgs,
 };
 
 pub mod balance;
+mod batch_command;
 pub mod cardinals;
 pub mod create;
 pub mod dump;
@@ -15,8 +16,10 @@ pub mod mint;
 pub mod outputs;
 pub mod receive;
 pub mod restore;
+pub mod resume;
 pub mod sats;
 pub mod send;
+mod shared_args;
 pub mod transactions;
 
 #[derive(Debug, Parser)]
@@ -39,6 +42,8 @@ pub(crate) struct WalletCommand {
 pub(crate) enum Subcommand {
   #[command(about = "Get wallet balance")]
   Balance,
+  #[command(about = "Create inscriptions and runes")]
+  Batch(batch_command::Batch),
   #[command(about = "Create new wallet")]
   Create(create::Create),
   #[command(about = "Dump wallet descriptors")]
@@ -53,6 +58,8 @@ pub(crate) enum Subcommand {
   Receive(receive::Receive),
   #[command(about = "Restore wallet")]
   Restore(restore::Restore),
+  #[command(about = "Resume pending etchings")]
+  Resume,
   #[command(about = "List wallet satoshis")]
   Sats(sats::Sats),
   #[command(about = "Send sat or inscription")]
@@ -89,11 +96,13 @@ impl WalletCommand {
 
     match self.subcommand {
       Subcommand::Balance => balance::run(wallet),
+      Subcommand::Batch(batch) => batch.run(wallet),
       Subcommand::Dump => dump::run(wallet),
       Subcommand::Inscribe(inscribe) => inscribe.run(wallet),
       Subcommand::Inscriptions => inscriptions::run(wallet),
       Subcommand::Mint(mint) => mint.run(wallet),
       Subcommand::Receive(receive) => receive.run(wallet),
+      Subcommand::Resume => resume::run(wallet),
       Subcommand::Sats(sats) => sats.run(wallet),
       Subcommand::Send(send) => send.run(wallet),
       Subcommand::Transactions(transactions) => transactions.run(wallet),

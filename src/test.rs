@@ -3,39 +3,14 @@ pub(crate) use {
   bitcoin::{
     blockdata::script::{PushBytes, PushBytesBuf},
     constants::COIN_VALUE,
-    WPubkeyHash,
+    opcodes, WPubkeyHash,
   },
+  mockcore::TransactionTemplate,
   pretty_assertions::assert_eq as pretty_assert_eq,
   std::iter,
   tempfile::TempDir,
-  test_bitcoincore_rpc::TransactionTemplate,
   unindent::Unindent,
 };
-
-macro_rules! assert_regex_match {
-  ($value:expr, $pattern:expr $(,)?) => {
-    let regex = Regex::new(&format!("^(?s){}$", $pattern)).unwrap();
-    let string = $value.to_string();
-
-    if !regex.is_match(string.as_ref()) {
-      eprintln!("Regex did not match:");
-      pretty_assert_eq!(regex.as_str(), string);
-    }
-  };
-}
-
-macro_rules! assert_matches {
-  ($expression:expr, $( $pattern:pat_param )|+ $( if $guard:expr )? $(,)?) => {
-    match $expression {
-      $( $pattern )|+ $( if $guard )? => {}
-      left => panic!(
-        "assertion failed: (left ~= right)\n  left: `{:?}`\n right: `{}`",
-        left,
-        stringify!($($pattern)|+ $(if $guard)?)
-      ),
-    }
-  }
-}
 
 pub(crate) fn txid(n: u64) -> Txid {
   let hex = format!("{n:x}");
@@ -129,10 +104,6 @@ pub(crate) fn inscription_id(n: u32) -> InscriptionId {
   }
 
   format!("{}i{n}", hex.repeat(64)).parse().unwrap()
-}
-
-pub(crate) fn rune_id(tx: u32) -> RuneId {
-  RuneId { block: 1, tx }
 }
 
 pub(crate) fn envelope(payload: &[&[u8]]) -> Witness {
