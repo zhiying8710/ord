@@ -332,7 +332,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       "entries": entries,
       "burned": burned.clone(),
       "outputs": outputs
-    }));
+    }).to_string());
 
     if let Some(rune_txs) = rune_txs {
       rune_txs.push(json!({
