@@ -1,7 +1,10 @@
+use self::artifact::u128_to_string_serialize;
+
 use super::*;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Copy)]
 pub struct Pile {
+  #[serde(serialize_with = "u128_to_string_serialize")]
   pub amount: u128,
   pub divisibility: u8,
   pub symbol: Option<char>,

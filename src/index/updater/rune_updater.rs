@@ -1,20 +1,23 @@
-use serde_json::to_string;
-
 use super::*;
+use self::index::entry::u128_to_string_serialize;
 
 #[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub(super) struct RuneTxEntry {
+  #[serde(serialize_with = "u128_to_string_serialize")]
   pub burned: u128,
   pub divisibility: u8,
   pub etching: Txid,
+  #[serde(serialize_with = "u128_to_string_serialize")]
   pub mints: u128,
   pub number: u64,
+  #[serde(serialize_with = "u128_to_string_serialize")]
   pub premine: u128,
   pub spaced_rune: SpacedRune,
   pub symbol: Option<char>,
   pub terms: Option<Terms>,
   pub timestamp: u64,
   pub mintable: bool,
+  #[serde(serialize_with = "u128_to_string_serialize")]
   pub supply: u128,
   pub start: Option<u64>,
   pub end: Option<u64>,
@@ -274,13 +277,9 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     }).collect();
 
     let entries: HashMap<RuneId, RuneTxEntry> = rune_entries.iter().map(|(k, v)| (*k, RuneTxEntry::load(v, self.height))).collect();
-
-    if self.height == 2584634 {
-      log::info!("{:?}", txid);
-      log::info!("{:?}", json!({
-        "artifact": Runestone::decipher(tx),
-      }));
-    }
+    let burned_: HashMap<RuneId, String> = burned.clone().iter().map(|(&rune_id, lot)| {
+      (rune_id, lot.n().to_string())
+    }).collect();
 
     if let Some(rune_txs) = rune_txs {
       rune_txs.push(json!({
@@ -290,7 +289,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
         "artifact": Runestone::decipher(tx),
         "pointer": real_pointer,
         "entries": entries,
-        "burned": burned.clone(),
+        "burned": burned_,
         "outputs": outputs
       }));
     }
