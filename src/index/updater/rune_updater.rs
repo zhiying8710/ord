@@ -275,7 +275,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
 
     let entries: HashMap<RuneId, RuneTxEntry> = rune_entries.iter().map(|(k, v)| (*k, RuneTxEntry::load(v, self.height))).collect();
 
-    log::info!("Parsed rune tx: {:?}", to_string(&json!({
+    log::info!("Parsed rune tx: {}", json!({
       "block": self.height,
       "txid": txid,
       "tx_index": tx_index,
@@ -284,7 +284,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       "entries": entries,
       "burned": burned.clone(),
       "outputs": outputs
-    })));
+    }));
 
     if let Some(rune_txs) = rune_txs {
       rune_txs.push(json!({
