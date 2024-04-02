@@ -59,7 +59,7 @@ pub(super) struct RuneUpdater<'a, 'tx, 'client> {
 
 impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
   pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid, rune_txs: &mut Option<Vec<Value>>) -> Result<()> {
-    let artifact = Runestone::decipher(tx)?;
+    let artifact = Runestone::decipher(tx);
     if artifact.is_none() {
         return Ok(());
     }
@@ -277,7 +277,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       "block": self.height,
       "txid": txid,
       "tx_index": tx_index,
-      "runestone": Runestone::decipher(tx)?.unwrap(),
+      "runestone": Runestone::decipher(tx),
       "pointer": real_pointer,
       "entries": entries,
       "burned": burned.clone(),
@@ -289,7 +289,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
         "block": self.height,
         "txid": txid,
         "tx_index": tx_index,
-        "runestone": Runestone::decipher(tx)?.unwrap(),
+        "runestone": Runestone::decipher(tx),
         "pointer": real_pointer,
         "entries": entries,
         "burned": burned.clone(),

@@ -141,7 +141,7 @@ impl Rest {
   ) -> ServerResult<Json<Option<Artifact>>> {
     let tx = index.get_raw_transaction(txid)?.unwrap();
     Ok(
-      Json(Runestone::decipher(&tx).unwrap())
+      Json(Runestone::decipher(&tx))
     )
   }
 
