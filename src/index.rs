@@ -214,6 +214,7 @@ pub struct Index {
 
 impl Index {
   pub fn open(settings: &Settings) -> Result<Self> {
+    log::info!("Index settings: {:?}", settings);
     Index::open_with_event_sender(settings, None)
   }
 
