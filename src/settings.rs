@@ -160,6 +160,7 @@ impl Settings {
   }
 
   pub(crate) fn from_options(options: Options) -> Self {
+    log::info!("Options: {:?}", options);
     Self {
       bitcoin_data_dir: options.bitcoin_data_dir,
       bitcoin_rpc_password: options.bitcoin_rpc_password,
@@ -190,17 +191,11 @@ impl Settings {
       server_password: options.server_password,
       server_url: None,
       server_username: options.server_username,
-      inscription_tx_push_url: match &options.inscription_tx_push_url {
-        Some(url) => Some(url.to_string()),
-        None => None
-      },
+      inscription_tx_push_url: options.inscription_tx_push_url,
       push_on_empty: options.push_on_empty,
       push_only_first_transfer: options.push_only_first_transfer,
       target_protocol: options.target_protocol,
-      rune_tx_push_url: match &options.rune_tx_push_url {
-        Some(url) => Some(url.to_string()),
-        None => None
-      },
+      rune_tx_push_url: options.rune_tx_push_url,
     }
   }
 
