@@ -150,15 +150,12 @@ impl Settings {
       server_password: self.server_password.or(source.server_password),
       server_url: self.server_url.or(source.server_url),
       server_username: self.server_username.or(source.server_username),
-      inscription_tx_push_url: match &source.inscription_tx_push_url {
-        Some(url) => Some(url.to_string()),
-        None => None
-      },
-      push_on_empty: source.push_on_empty,
-      push_only_first_transfer: source.push_only_first_transfer,
-      target_protocol: source.target_protocol,
+      inscription_tx_push_url: self.inscription_tx_push_url.or(source.inscription_tx_push_url),
+      push_on_empty: self.push_on_empty || source.push_on_empty,
+      push_only_first_transfer: self.push_only_first_transfer || source.push_only_first_transfer,
+      target_protocol: self.target_protocol.or(source.target_protocol),
 
-      rune_tx_push_url: source.rune_tx_push_url
+      rune_tx_push_url: self.rune_tx_push_url.or(source.rune_tx_push_url),
     }
   }
 
