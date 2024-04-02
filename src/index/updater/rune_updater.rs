@@ -1,3 +1,5 @@
+use serde_json::to_string;
+
 use super::*;
 
 #[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
@@ -273,18 +275,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
 
     let entries: HashMap<RuneId, RuneTxEntry> = rune_entries.iter().map(|(k, v)| (*k, RuneTxEntry::load(v, self.height))).collect();
 
-    if self.height == 2584634 {
-      log::info!("xxxx: {:?}", self.height);
-      log::info!("xxxx: {:?}", txid);
-      log::info!("xxxx: {:?}", tx_index);
-      log::info!("xxxx: {:?}", Runestone::decipher(tx));
-      log::info!("xxxx: {:?}", real_pointer);
-      log::info!("xxxx: {:?}", entries);
-      log::info!("xxxx: {:?}", burned.clone());
-      log::info!("xxxx: {:?}", outputs);
-    }
-
-    log::info!("Parsed rune tx: {:?}", json!({
+    log::info!("Parsed rune tx: {:?}", to_string(&json!({
       "block": self.height,
       "txid": txid,
       "tx_index": tx_index,
@@ -293,7 +284,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       "entries": entries,
       "burned": burned.clone(),
       "outputs": outputs
-    }).to_string());
+    })));
 
     if let Some(rune_txs) = rune_txs {
       rune_txs.push(json!({
