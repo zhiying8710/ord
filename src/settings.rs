@@ -92,8 +92,9 @@ impl Settings {
       Settings::default()
     };
 
+    log::info!("merging settings: {:?}, {:?}", settings, config);
+
     let settings = settings.or(config).or_defaults()?;
-    log::info!("merging settings: {:?}", settings);
 
     match (
       &settings.bitcoin_rpc_username,
