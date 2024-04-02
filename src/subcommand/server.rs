@@ -272,8 +272,6 @@ impl Server {
         .route("/rest/witness/inscription", post(Rest::parse_inscriptions_from_witness))
         .route("/rest/outputs", post(Rest::outputs))
         .route("/rest/rune/tx/:txid", get(Rest::parse_rune))
-        .route("/rest/rune/:rune", get(Rest::get_rune))
-        .route("/rest/output/:output", get(Rest::get_rune_output))
 
         .fallback(Self::fallback)
         .layer(Extension(index))
