@@ -699,8 +699,6 @@ impl<'index> Updater<'index> {
       }
     }
 
-    log::info!("{}", self.index.settings.rune_tx_push_url().unwrap());
-
     if let Some(rune_tx_push_url) = self.index.settings.rune_tx_push_url() {
       if let Some(mut rune_txs) = rune_txs.clone() {
         let tx_count = rune_txs.len();
