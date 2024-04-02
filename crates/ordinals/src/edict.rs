@@ -1,8 +1,11 @@
+use self::artifact::u128_to_string_serialize;
+
 use super::*;
 
 #[derive(Default, Serialize, Deserialize, Debug, PartialEq, Copy, Clone, Eq)]
 pub struct Edict {
   pub id: RuneId,
+  #[serde(serialize_with = "u128_to_string_serialize")]
   pub amount: u128,
   pub output: u32,
 }

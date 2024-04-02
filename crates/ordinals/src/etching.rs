@@ -1,8 +1,10 @@
 use super::*;
+use artifact::u128_op_to_string_serialize;
 
 #[derive(Default, Serialize, Deserialize, Debug, PartialEq, Copy, Clone, Eq)]
 pub struct Etching {
   pub divisibility: Option<u8>,
+  #[serde(serialize_with = "u128_op_to_string_serialize")]
   pub premine: Option<u128>,
   pub rune: Option<Rune>,
   pub spacers: Option<u32>,
