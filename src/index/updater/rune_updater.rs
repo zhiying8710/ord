@@ -267,17 +267,8 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       return x;
     }).collect();
 
-    if self.height == 2584608 {
-      for ele in entry_ids.clone() {
-          let x = self.id_to_entry.get(&ele.store()).unwrap();
-          if x.is_none() {
-            log::info!("2584608 tx {:?}, runestone: {:?}", txid, Runestone::decipher(tx));
-          }
-      }
-    }
-
-    let rune_entries: HashMap<RuneId, RuneEntry> = entry_ids.into_iter().map(|id| {
-      (id, RuneEntry::load(self.id_to_entry.get(&id.store()).unwrap().unwrap().value()))
+    let rune_entries: HashMap<RuneId, RuneEntry> = entry_ids.into_iter().filter_map(|id| {
+      self.id_to_entry.get(&id.store()).unwrap().map(|entry| (id, RuneEntry::load(entry.value())))
     }).collect();
 
     let entries: HashMap<RuneId, RuneTxEntry> = rune_entries.iter().map(|(k, v)| (*k, RuneTxEntry::load(v, self.height))).collect();
