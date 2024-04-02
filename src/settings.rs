@@ -37,6 +37,7 @@ pub struct Settings {
 
 impl Settings {
   pub(crate) fn load(options: Options) -> Result<Settings> {
+    log::info!("Load from options: {:?}", options);
     let mut env = BTreeMap::<String, String>::new();
 
     for (var, value) in env::vars_os() {
