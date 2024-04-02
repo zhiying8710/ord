@@ -15,7 +15,7 @@ where
     state: &S,
   ) -> Result<Self, Self::Rejection> {
     let state = Arc::from_ref(state);
-    let json_api_enabled = state.json_api_enabled;
+    let json_api_enabled = true;
     let json_header = parts
       .headers
       .get("accept")
