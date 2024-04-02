@@ -276,29 +276,9 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     let entries: HashMap<RuneId, RuneTxEntry> = rune_entries.iter().map(|(k, v)| (*k, RuneTxEntry::load(v, self.height))).collect();
 
     if self.height == 2584634 {
-      log::info!("{:?}", json!({
-        "block": self.height,
-      }));
-      log::info!("{:?}", json!({
-        "txid": txid,
-      }));
-      log::info!("{:?}", json!({
-        "tx_index": tx_index,
-      }));
+      log::info!("{:?}", txid);
       log::info!("{:?}", json!({
         "artifact": Runestone::decipher(tx),
-      }));
-      log::info!("{:?}", json!({
-        "pointer": real_pointer,
-      }));
-      log::info!("{:?}", json!({
-        "entries": entries,
-      }));
-      log::info!("{:?}", json!({
-        "burned": burned.clone(),
-      }));
-      log::info!("{:?}", json!({
-        "outputs": outputs
       }));
     }
 
