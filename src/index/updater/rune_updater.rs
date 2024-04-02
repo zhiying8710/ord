@@ -277,7 +277,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       "block": self.height,
       "txid": txid,
       "tx_index": tx_index,
-      "runestone": Runestone::decipher(tx),
+      "runestone": Runestone::decipher(tx).unwrap_or(Artifact::Runestone(Runestone::default())),
       "pointer": real_pointer,
       "entries": entries,
       "burned": burned.clone(),
