@@ -172,6 +172,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
 
     let mut burned: HashMap<RuneId, Lot> = HashMap::new();
     let mut real_pointer: u32 = 0;
+    let mut pointer_balances: HashMap<RuneId, Lot> = HashMap::new();
 
     if let Some(Artifact::Cenotaph(_)) = artifact {
       for (id, balance) in unallocated {
@@ -205,6 +206,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
           entry_ids.insert(id);
           if balance > 0 {
             *allocated[vout].entry(id).or_default() += balance;
+            *pointer_balances.entry(id).or_default() += balance;
           }
         }
       } else {
@@ -280,6 +282,9 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     let burned_: HashMap<RuneId, String> = burned.clone().iter().map(|(&rune_id, lot)| {
       (rune_id, lot.n().to_string())
     }).collect();
+    let pointer_balances_: HashMap<RuneId, String> = pointer_balances.clone().iter().map(|(&rune_id, lot)| {
+      (rune_id, lot.n().to_string())
+    }).collect();
 
     if let Some(rune_txs) = rune_txs {
       rune_txs.push(json!({
@@ -287,6 +292,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
         "txid": txid,
         "tx_index": tx_index,
         "artifact": Runestone::decipher(tx),
+        "pointer_balances": pointer_balances_,
         "pointer": real_pointer,
         "entries": entries,
         "burned": burned_,
