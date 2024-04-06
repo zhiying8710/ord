@@ -262,7 +262,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       *self.burned.entry(id).or_default() += amount;
     }
 
-    let outputs: Vec<Vec<(SpacedRune, Pile)>>  = tx.output.clone().into_iter()
+    let outputs: Vec<Vec<(RuneId, Pile)>>  = tx.output.clone().into_iter()
     .enumerate()
     .map(|(vout, _)| {
       let x = self.get_rune_balances_for_outpoint(OutPoint {
@@ -297,7 +297,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     Ok(())
   }
 
-  pub(super) fn get_rune_balances_for_outpoint(&mut self, outpoint: OutPoint,) -> Result<Vec<(SpacedRune, Pile)>>{
+  pub(super) fn get_rune_balances_for_outpoint(&mut self, outpoint: OutPoint,) -> Result<Vec<(RuneId, Pile)>>{
     let Some(balances) = self.outpoint_to_balances.get(&outpoint.store())? else {
       return Ok(Vec::new());
     };
@@ -312,7 +312,7 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
       let entry = RuneEntry::load(self.id_to_entry.get(id.store())?.unwrap().value());
 
       balances.push((
-        entry.spaced_rune,
+        id,
         Pile {
           amount,
           divisibility: entry.divisibility,
