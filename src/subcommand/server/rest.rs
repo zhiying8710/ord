@@ -226,14 +226,14 @@ fn _get_inscription(
   index: &Arc<Index>,
   query: query::Inscription,
 ) -> Result<Value, ServerError>{
-  let info = Index::inscription_info(&index, query)?.ok_or_not_found(|| format!("inscription {query}"))?;
+  let (api_inscription, tx_out, _) = Index::inscription_info(&index, query)?.ok_or_not_found(|| format!("inscription {query}"))?;
 
-  let raw_tx = index.get_raw_transaction(info.entry.id.txid)?;
+  let raw_tx = index.get_raw_transaction(api_inscription.id.txid)?;
 
   let current_inscription : Inscription = raw_tx.and_then(|tx| {
     ParsedEnvelope::from_transaction(&tx, &Some("".to_string()))
     .into_iter()
-    .nth(info.entry.id.index as usize)
+    .nth(api_inscription.id.index as usize)
     .map(|envelope| envelope.payload)
   }).unwrap();
 
@@ -244,16 +244,14 @@ fn _get_inscription(
 
   Ok(
     json!({
-      "genesis_fee": info.entry.fee,
-      "genesis_height": info.entry.height,
-      "content_length": info.inscription.content_length(),
-      "content_type": info.inscription.content_type().map(|s| s.to_string()),
+      "genesis_fee": api_inscription.fee,
+      "genesis_height": api_inscription.height,
+      "content_length": api_inscription.content_length,
+      "content_type": api_inscription.content_type,
       "content": content,
-      "inscription_id": info.entry.id,
-      "charms": Charm::charms(info.entry.charms),
-      "address": info
-      .output
-      .as_ref()
+      "inscription_id": api_inscription.id,
+      "charms": api_inscription.charms,
+      "address": tx_out.as_ref()
       .and_then(|o| {
         server_config
           .chain
@@ -261,12 +259,12 @@ fn _get_inscription(
           .ok()
       })
       .map(|address| address.to_string()),
-      "number": info.entry.inscription_number,
+      "number": api_inscription.number,
       "output": json!({
-        "value": info.output.as_ref().map(|o| o.value)
+        "value": tx_out.as_ref().map(|o| o.value)
       }),
-      "sat": info.entry.sat,
-      "satpoint": info.satpoint,
+      "sat": api_inscription.sat,
+      "satpoint": api_inscription.satpoint,
       "metadata": match current_inscription.clone().metadata() {
         Some(meta) => match to_string(&meta) {
           Ok(v) => v,
@@ -275,7 +273,7 @@ fn _get_inscription(
         _ => "{}".to_owned(),
       },
       "metaprotocol": current_inscription.metaprotocol(),
-      "timestamp": info.entry.timestamp,
+      "timestamp": api_inscription.timestamp,
      })
   )
 }

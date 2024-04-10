@@ -1143,13 +1143,13 @@ mod tests {
 
     assert_eq!(
       vec![parent],
-      ParsedEnvelope::from_transaction(&reveal_tx)[0]
+      ParsedEnvelope::from_transaction(&reveal_tx, &Some("".to_string()))[0]
         .payload
         .parents(),
     );
     assert_eq!(
       vec![parent],
-      ParsedEnvelope::from_transaction(&reveal_tx)[1]
+      ParsedEnvelope::from_transaction(&reveal_tx, &Some("".to_string()))[1]
         .payload
         .parents(),
     );
