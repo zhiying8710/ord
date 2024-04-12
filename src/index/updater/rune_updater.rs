@@ -16,6 +16,7 @@ pub(super) struct RuneTxEntry {
   pub symbol: Option<char>,
   pub terms: Option<Terms>,
   pub timestamp: u64,
+  pub turbo: bool,
   pub mintable: bool,
   #[serde(serialize_with = "u128_to_string_serialize")]
   pub supply: u128,
@@ -37,6 +38,7 @@ impl RuneTxEntry {
       symbol: rune_entry.symbol,
       terms: rune_entry.terms,
       timestamp: rune_entry.timestamp,
+      turbo: rune_entry.turbo,
       mintable: rune_entry.mintable(current_block as u64 + 1).is_ok(),
       supply: rune_entry.supply(),
       start: rune_entry.start(),
