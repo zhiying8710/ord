@@ -68,9 +68,6 @@ pub(super) struct RuneUpdater<'a, 'tx, 'client> {
 impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
   pub(super) fn index_runes(&mut self, tx_index: u32, tx: &Transaction, txid: Txid, rune_txs: &mut Option<Vec<Value>>) -> Result<()> {
     let artifact = Runestone::decipher(tx);
-    if artifact.is_none() {
-        return Ok(());
-    }
 
     let mut unallocated = self.unallocated(tx)?;
 
@@ -319,17 +316,19 @@ impl<'a, 'tx, 'client> RuneUpdater<'a, 'tx, 'client> {
     }).collect();
 
     if let Some(rune_txs) = rune_txs {
-      rune_txs.push(json!({
-        "block": self.height,
-        "txid": txid,
-        "tx_index": tx_index,
-        "artifact": Runestone::decipher(tx),
-        "pointer_balances": pointer_balances_,
-        "pointer": real_pointer,
-        "entries": entries,
-        "burned": burned_,
-        "outputs": outputs
-      }));
+      if entries.len() > 0 {
+        rune_txs.push(json!({
+          "block": self.height,
+          "txid": txid,
+          "tx_index": tx_index,
+          "artifact": Runestone::decipher(tx),
+          "pointer_balances": pointer_balances_,
+          "pointer": real_pointer,
+          "entries": entries,
+          "burned": burned_,
+          "outputs": outputs
+        }));
+      }
     }
 
     Ok(())
