@@ -1,14 +1,21 @@
 use {
-  super::*,
-  axum::{
-    response::Json,
-    extract::{Extension, Path},
-    extract,
-  },
-  serde_json::{Value, json, to_string},
-  base64::{Engine as _, engine::general_purpose},
-  hex,
+  super::*, axum::{
+    extract::{self, Extension, Path}, response::Json
+  }, base64::{engine::general_purpose, Engine as _}, bitcoin::{consensus::ReadExt, hashes::hex::HexIterator, consensus::encode::Error as BtcError}, hex, serde_json::{json, to_string, Value}
 };
+use bitcoincore_rpc::Error as BtcRpcError;
+
+fn deserialize_hex<T: Decodable>(hex: &str) -> Result<T> {
+  let mut reader = HexIterator::new(&hex)?;
+  let object = Decodable::consensus_decode(&mut reader)?;
+  if reader.read_u8().is_ok() {
+      Err(BtcRpcError::BitcoinSerialization(BtcError::ParseFailed(
+          "data not consumed entirely when explicitly deserializing",
+      )).into())
+  } else {
+      Ok(object)
+  }
+}
 
 
 pub(super) struct Rest {
@@ -219,6 +226,15 @@ impl Rest {
     Ok(Json(_outputs))
   }
 
+  pub async fn parse_rune_from_hex(
+    Extension(server_config): Extension<Arc<ServerConfig>>,
+    Extension(index): Extension<Arc<Index>>,
+    tx_hex: String,
+  ) -> ServerResult<Json<Option<Artifact>>> {
+    let tx: Transaction = deserialize_hex(&tx_hex).unwrap();
+    Ok(Json(Runestone::decipher(&tx)))
+  }
+
 }
 
 fn _get_inscription(
@@ -276,4 +292,11 @@ fn _get_inscription(
       "timestamp": api_inscription.timestamp,
      })
   )
+}
+
+#[test]
+fn test_rune_op_return() {
+  let tx_hex = "02000000000101fa6b70a1340130c92dbf5fc63309d4681c616838a908d0e7d9c07b49be6582460000000000fdffffff0310270000000000002251205181d6944712849ae0bb4bf560663d6f924eb166e70fed78a95fc8c9c9f83bbf102700000000000022512058903486c396b28d0ace8d43f30d37f1c810b231ad3079ae1a1e13647d2c66080000000000000000306a5d2d02030484ded3a5b58a8285fac8a0fc8e080388800205b12d06e8070ae80708808088fccdbcc323000000e807010340453c8cb474abfdd01b3fb3f7966e5cde7dbbb54d0a531d2a6f7796e511c241b024f99c7ace6822a66d8beb12a7ef9bcc067d1c9ec5d13060c4a8b7e1269df3a15c208d6d0667c2ecfd0cf60e80e3fa848d22bde4e5a63ff2cd879d0456368e9c0d40ac0063036f7264010118746578742f706c61696e3b636861727365743d7574662d38010200010d0c04efb45453080a7a2488ef400004e19ab10a6821c18d6d0667c2ecfd0cf60e80e3fa848d22bde4e5a63ff2cd879d0456368e9c0d4000000000";
+  let tx: Transaction = deserialize_hex(tx_hex).unwrap();
+  println!("{:?}", Runestone::decipher(&tx))
 }

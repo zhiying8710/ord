@@ -273,6 +273,7 @@ impl Server {
         .route("/rest/witness/inscription", post(Rest::parse_inscriptions_from_witness))
         .route("/rest/outputs", post(Rest::outputs))
         .route("/rest/rune/tx/:txid", get(Rest::parse_rune))
+        .route("/rest/rune/tx_hex", post(Rest::parse_rune_from_hex))
 
         .fallback(Self::fallback)
         .layer(Extension(index))
