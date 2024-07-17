@@ -235,6 +235,14 @@ impl Rest {
     Ok(Json(Runestone::decipher(&tx)))
   }
 
+  pub async fn parse_rune_from_scriptpubkey(
+    Extension(server_config): Extension<Arc<ServerConfig>>,
+    Extension(index): Extension<Arc<Index>>,
+    extract::Json(runestone_scriptpubkey): extract::Json<RunestoneScriptpubkey>,
+  ) -> ServerResult<Json<Option<Artifact>>> {
+    Ok(Json(Runestone::decipher_from_scriptpubkey(&runestone_scriptpubkey.hex, runestone_scriptpubkey.out_len)))
+  }
+
 }
 
 fn _get_inscription(

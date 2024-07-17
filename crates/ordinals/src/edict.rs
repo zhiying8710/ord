@@ -12,13 +12,17 @@ pub struct Edict {
 
 impl Edict {
   pub fn from_integers(tx: &Transaction, id: RuneId, amount: u128, output: u128) -> Option<Self> {
+    Edict::from_integers_by_out_len(tx.output.len(), id, amount, output)
+  }
+
+  pub fn from_integers_by_out_len(out_len: usize, id: RuneId, amount: u128, output: u128) -> Option<Self> {
     let Ok(output) = u32::try_from(output) else {
       return None;
     };
 
     // note that this allows `output == tx.output.len()`, which means to divide
     // amount between all non-OP_RETURN outputs
-    if output > u32::try_from(tx.output.len()).unwrap() {
+    if output > u32::try_from(out_len).unwrap() {
       return None;
     }
 

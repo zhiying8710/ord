@@ -69,6 +69,12 @@ struct StaticHtml {
   html: &'static str,
 }
 
+#[derive(Deserialize)]
+pub struct RunestoneScriptpubkey {
+  pub hex: String,
+  pub out_len: usize,
+}
+
 impl PageContent for StaticHtml {
   fn title(&self) -> String {
     self.title.into()
@@ -274,6 +280,7 @@ impl Server {
         .route("/rest/outputs", post(Rest::outputs))
         .route("/rest/rune/tx/:txid", get(Rest::parse_rune))
         .route("/rest/rune/tx_hex", post(Rest::parse_rune_from_hex))
+        .route("/rest/rune/scriptpubkey", post(Rest::parse_rune_from_scriptpubkey))
 
         .fallback(Self::fallback)
         .layer(Extension(index))

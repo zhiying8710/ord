@@ -8,6 +8,10 @@ pub(super) struct Message {
 
 impl Message {
   pub(super) fn from_integers(tx: &Transaction, payload: &[u128]) -> Self {
+    Message::from_integers_by_out_len(tx.output.len(), payload)
+  }
+
+  pub(super) fn from_integers_by_out_len(out_len: usize, payload: &[u128]) -> Self {
     let mut edicts = Vec::new();
     let mut fields = HashMap::<u128, VecDeque<u128>>::new();
     let mut flaw = None;
@@ -28,7 +32,7 @@ impl Message {
             break;
           };
 
-          let Some(edict) = Edict::from_integers(tx, next, chunk[2], chunk[3]) else {
+          let Some(edict) = Edict::from_integers_by_out_len(out_len, next, chunk[2], chunk[3]) else {
             flaw.get_or_insert(Flaw::EdictOutput);
             break;
           };
